@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="js/security-core.js?v=2"></script>
+    <script src="js/core/SecurityArmor.js?v=2"></script>
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>App Somospadel BCN</title>
+
+    <!-- PWA / Mobile Capable -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Somospadel BCN">
+    <meta name="theme-color" content="#CCFF00">
+    <meta name="description" content="Resultados a tiempo real de nuestra comunidad">
+
+    <!-- Open Graph (SEO & Social Sharing) -->
+    <meta property="og:title" content="App Somospadel BCN">
+    <meta property="og:description" content="Resultados a tiempo real de nuestra comunidad">
+    <meta property="og:image" content="img/logo_somospadel.png">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="img/logo_somospadel.png">
+
+    <!-- Mobile Optimization -->
+    <meta name="HandheldFriendly" content="true">
+    <meta name="format-detection" content="telephone=no">
+
+    <!-- iOS Icons & Splash Hints -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/33/33736.png">
+    <link rel="apple-touch-startup-image" href="https://cdn-icons-png.flaticon.com/512/33/33736.png">
+
+    <!-- CSS Dependencies -->
+    <link rel="stylesheet" href="css/theme-playtomic.css?v=701">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@700;800;900&family=Caveat:wght@700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script>
+        // registry initialization
+        window._matchRegistry = window._matchRegistry || {};
+    </script>
+    <style>
+        @keyframes loginBallLife {
+            0% {
+                transform: translateY(0) scale(1) rotate(0deg);
+                filter: drop-shadow(0 0 15px rgba(204, 255, 0, 0.4));
+            }
+
+            15% {
+                transform: translateY(-40px) scale(0.9, 1.1) rotate(15deg);
+                filter: drop-shadow(0 0 35px rgba(204, 255, 0, 0.8));
+            }
+
+            30% {
+                transform: translateY(0) scale(1.2, 0.8) rotate(0deg);
+                filter: drop-shadow(0 0 15px rgba(204, 255, 0, 0.6));
+            }
+
+            45% {
+                transform: translateY(-20px) scale(0.95, 1.05) rotate(-10deg);
+                filter: drop-shadow(0 0 25px rgba(204, 255, 0, 0.7));
+            }
+
+            60% {
+                transform: translateY(0) scale(1.1, 0.9) rotate(0deg);
+                filter: drop-shadow(0 0 15px rgba(204, 255, 0, 0.5));
+            }
+
+            100% {
+                transform: translateY(0) scale(1) rotate(360deg);
+                filter: drop-shadow(0 0 15px rgba(204, 255, 0, 0.4));
+            }
+        }
+
+        .login-ball-animate {
+            animation: loginBallLife 3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+        }
+
+        @keyframes pulse-soft {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.02);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* --- HEADER NAVIGATION TABS (NEON LED DESIGN) --- */
+        .header-tabs {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 48px;
+            background: #CCFF00 !important;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 1001;
+            width: 100%;
+        }
+
+        .header-tab {
+            flex: 1;
+            text-align: center;
+            font-weight: 800;
+            font-size: 0.75rem;
+            color: rgba(0, 0, 0, 0.6);
+            cursor: pointer;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            position: relative;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .header-tab::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 4px;
+            background: #FF5500;
+            /* NEON ORANGE */
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateX(-50%);
+            border-radius: 4px 4px 0 0;
+        }
+
+        .header-tab.active {
+            font-weight: 900;
+            color: #000;
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .header-tab.active::after {
+            width: 80%;
+            box-shadow: 0 0 15px #FF5500, 0 0 30px rgba(255, 85, 0, 0.6);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- App Shell Playtomic (Mobile First) -->
+    <div id="app-shell" class="flex-col hidden">
+
+        <!-- GLOBAL FIXED HEADER (Ticker + Command Bar) -->
+        <div class="dashboard-fixed-header">
+            <!-- TOP TICKER (Running Text) -->
+            <div class="ticker-container" onclick="window.Router && window.Router.navigate('americanas')"
+                style="cursor: pointer;">
+                <div class="ticker-track" id="ticker-track">
+                    <div class="ticker-item"><span>🔴 EN JUEGO:</span> Pista 1 (Tie-Break)</div>
+                    <div class="ticker-item"><span>🏆 TORNEO:</span> Final "Rey de la Pista" 20:00h</div>
+                    <div class="ticker-item"><span>🚀 RANKING:</span> ¡Alejandro ha subido a 4.2!</div>
+                    <div class="ticker-item"><span>🔥 CLUB:</span> 120 Jugadores en pista ahora</div>
+                </div>
+            </div>
+
+            <!-- COMMAND BAR -->
+            <div class="cmd-bar"
+                style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; height: 60px; box-sizing: border-box;">
+                <!-- LEFT HAMBURGER TRIGGER -->
+                <div class="header-burger-btn" style="flex-shrink: 0;"
+                    onclick="document.getElementById('side-drawer-container').classList.add('open'); document.getElementById('side-drawer-menu').classList.add('open');">
+                    <i class="fas fa-bars"></i>
+                </div>
+
+                <div class="cmd-brand"
+                    style="display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; overflow: hidden;">
+                    <img src="img/logo_somospadel.png" alt="Somos Padel"
+                        style="height: 32px; width: auto; flex-shrink: 0; filter: none !important;">
+                    <div
+                        style="line-height:1.1; display:flex; flex-direction:column; justify-content:center; white-space: nowrap;">
+                        <span
+                            style="font-size:0.8rem; font-weight: 900; letter-spacing:-0.5px; color: white;">SOMOSPADEL<span
+                                style="color:var(--brand-neon)"> BCN</span></span>
+                        <span style="font-size:0.5rem; color:#888; letter-spacing:1px; font-weight:700;">COMPITE Y
+                            DISFRUTA</span>
+                    </div>
+                </div>
+
+                <div class="cmd-avatar-container" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                    <div style="text-align:right; display:flex; flex-direction:column; line-height: 1;"
+                        onclick="window.Router && window.Router.navigate('profile')">
+                        <span style="font-size:0.5rem; color:#bbb; font-weight:700;">HOLA,</span>
+                        <span
+                            style="font-size:0.75rem; font-weight:800; color:white; max-width: 60px; overflow: hidden; text-overflow: ellipsis;"
+                            id="header-user-name">ALEX</span>
+                    </div>
+                    <div class="cmd-avatar" id="header-user-avatar"
+                        style="width: 32px; height: 32px; font-size: 0.8rem;"
+                        onclick="window.Router && window.Router.navigate('profile')">
+                        AL
+                    </div>
+                    <div onclick="window.AuthController && window.AuthController.handleLogout()"
+                        style="color: rgba(255,255,255,0.4); padding: 5px; cursor: pointer; font-size: 1rem;">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NAVIGATION TABS -->
+            <div class="header-tabs"
+                style="display:flex; justify-content:space-around; align-items:center; height:46px; background:#CCFF00; border-bottom:1px solid rgba(0,0,0,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.1); position:relative; z-index:100; width:100%;">
+                <div class="header-tab active" onclick="window.Router && window.Router.navigate('dashboard')"
+                    style="flex:1; text-align:center; font-weight:900; font-size:0.75rem; color:#000; cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; position:relative;">
+                    INICIO
+                </div>
+                <div class="header-tab" onclick="window.Router && window.Router.navigate('entrenos')"
+                    style="flex:1; text-align:center; font-weight:700; font-size:0.75rem; color:rgba(0,0,0,0.5); cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; position:relative;">
+                    EVENTOS
+                </div>
+                <div class="header-tab" onclick="window.Router && window.Router.navigate('ranking')"
+                    style="flex:1; text-align:center; font-weight:700; font-size:0.75rem; color:rgba(0,0,0,0.5); cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; position:relative;">
+                    RANKING
+                </div>
+                <!-- HALL OF FAME TAB -->
+                <div class="header-tab" onclick="window.Router && window.Router.navigate('records')"
+                    style="flex:1; text-align:center; font-weight:700; font-size:0.75rem; color:rgba(0,0,0,0.5); cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; position:relative;">
+                    RÉCORDS
+                </div>
+                <div class="header-tab" onclick="window.Router && window.Router.navigate('profile')"
+                    style="flex:1; text-align:center; font-weight:700; font-size:0.75rem; color:rgba(0,0,0,0.5); cursor:pointer; height:100%; display:flex; align-items:center; justify-content:center; position:relative;">
+                    PERFIL
+                </div>
+            </div>
+        </div>
+
+        <!-- GLOBAL SIDE DRAWER -->
+        <div id="side-drawer-container" class="side-drawer-overlay"
+            onclick="this.classList.remove('open'); document.getElementById('side-drawer-menu').classList.remove('open');">
+        </div>
+        <div id="side-drawer-menu" class="side-drawer" style="z-index: 20000;">
+            <div class="drawer-header">
+                <div style="font-weight:800; color:white; font-size:1.2rem;">MENÚ</div>
+                <i class="fas fa-times" style="color:white; font-size:1.4rem;"
+                    onclick="document.getElementById('side-drawer-container').classList.remove('open'); document.getElementById('side-drawer-menu').classList.remove('open');"></i>
+            </div>
+            <!-- Dynamic Menu Section -->
+            <div id="dynamic-menu-items">
+                <div style="padding: 20px; text-align: center; color: #888;">
+                    <span class="loader-mini"></span> Cargando menú...
+                </div>
+            </div>
+
+            <!-- New Logout Drawer Item -->
+            <div class="drawer-item"
+                style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 20px; color: #ff4d4d;"
+                onclick="window.AuthController && window.AuthController.handleLogout()">
+                <i class="fas fa-power-off"></i> <span>Cerrar Sesión</span>
+            </div>
+        </div>
+
+        <!-- Main Content Area (Scrollable) -->
+        <!-- Added pt-130 class logic conceptually via CSS .full-width-mobile applied to children or logic -->
+        <main id="content-area" style="min-height: 100vh; padding-top: 148px;">
+            <!-- Loading Skeleton -->
+            <div class="dashboard-v2-container" style="padding-top: 40px; text-align: center;">
+                <div class="loader"></div>
+            </div>
+        </main>
+
+        <!-- Navigation Dock (Floating Glass) -->
+        <div class="nav-dock-container">
+
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Force Login Modal on Load -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Show login modal immediately
+            const currentUser = window.Store ? window.Store.getState('currentUser') : null;
+            if (!currentUser) {
+                const authModal = document.getElementById('auth-modal');
+                const appShell = document.getElementById('app-shell');
+                if (authModal) authModal.classList.remove('hidden');
+                if (appShell) appShell.classList.add('hidden');
+                console.log('🔐 Showing login modal - No user detected');
+            }
+        });
+    </script>
+
+    <div id="auth-modal" class="modal-overlay auth-overlay-enterprise"
+        style="backdrop-filter: blur(30px); background: radial-gradient(circle at center, #1a3a1a 0%, #0d1f2d 30%, #0a0f1a 60%, #000000 100%); display: flex !important; z-index: 2147483647 !important; align-items: center; justify-content: center; position: fixed; inset: 0;">
+
+        <!-- ANIMATIONS CSS -->
+        <style>
+            /* Card Entrance */
+            .card-enter {
+                animation: cardSlideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+                opacity: 0;
+                /* Animación maneja la entrada, pero aseguramos forwards */
+                transform: translateY(20px);
+            }
+
+            @keyframes cardSlideUp {
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            /* ESTILO "BRILLI BRILLI" NEÓN INTENSO */
+            .card-super-led {
+                border: 2px solid #CCFF00;
+                /* La animación se maneja en combinación con card-enter abajo */
+            }
+
+            /* NUEVA CLASE MÁGICA DE COLORES INTENSA */
+            .card-magic-border {
+                border: 3px solid #CCFF00;
+                /* Animación compuesta: Entrada + Glow Infinito */
+                animation:
+                    cardSlideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards,
+                    magicColors 3s linear infinite;
+            }
+
+            @keyframes magicColors {
+                0% {
+                    border-color: #ffe600;
+                    /* Amarillo Brillante */
+                    box-shadow: 0 0 30px rgba(255, 230, 0, 0.7), 0 0 60px rgba(255, 230, 0, 0.3);
+                }
+
+                25% {
+                    border-color: #ff00ff;
+                    /* Magenta Neón */
+                    box-shadow: 0 0 30px rgba(255, 0, 255, 0.7), 0 0 60px rgba(255, 0, 255, 0.3);
+                }
+
+                50% {
+                    border-color: #00ffff;
+                    /* Cyan Eléctrico */
+                    box-shadow: 0 0 30px rgba(0, 255, 255, 0.7), 0 0 60px rgba(0, 255, 255, 0.3);
+                }
+
+                75% {
+                    border-color: #ff5500;
+                    /* Naranja Lava */
+                    box-shadow: 0 0 30px rgba(255, 85, 0, 0.7), 0 0 60px rgba(255, 85, 0, 0.3);
+                }
+
+                100% {
+                    border-color: #ffe600;
+                    /* Vuelta al inicio */
+                    box-shadow: 0 0 30px rgba(255, 230, 0, 0.7), 0 0 60px rgba(255, 230, 0, 0.3);
+                }
+            }
+
+            /* Logo Live Physics */
+            .logo-live {
+                animation: floatBallLive 4s ease-in-out infinite;
+                transform-origin: bottom center;
+            }
+
+            @keyframes floatBallLive {
+
+                0%,
+                100% {
+                    transform: translateY(0) scale(1) rotate(0deg);
+                    filter: drop-shadow(0 0 20px rgba(204, 255, 0, 0.5));
+                }
+
+                50% {
+                    transform: translateY(-12px) scale(1.05) rotate(5deg);
+                    filter: drop-shadow(0 15px 30px rgba(204, 255, 0, 0.3));
+                }
+            }
+
+            /* Input Focus */
+            .clean-input {
+                box-sizing: border-box;
+            }
+
+            .clean-input:focus {
+                outline: none;
+                border: 2px solid #CCFF00 !important;
+                box-shadow: 0 0 0 4px rgba(204, 255, 0, 0.1);
+            }
+
+            /* Button Hover */
+            .neon-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(204, 255, 0, 0.4);
+            }
+
+            /* Checkbox Custom */
+            .custom-checkbox {
+                appearance: none;
+                width: 20px;
+                height: 20px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-radius: 4px;
+                background: transparent;
+                cursor: pointer;
+                position: relative;
+                transition: all 0.2s;
+            }
+
+            .custom-checkbox:checked {
+                background: #CCFF00;
+                border-color: #CCFF00;
+            }
+
+            .custom-checkbox:checked::after {
+                content: '✓';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: black;
+                font-weight: bold;
+                font-size: 14px;
+            }
+        </style>
+
+        <!-- The Card -->
+        <div class="modal-content admin-login-card card-enter card-magic-border"
+            style="margin: 40px auto; background: #0a0a0a; border-radius: 24px; position: relative; max-width: 360px; width: 100%; padding: 40px 30px; overflow: visible !important;">
+
+            <!-- Logo with Glow -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <img src="img/logo_somospadel.png" class="logo-live" style="height: 80px; margin-bottom: 25px;"
+                    alt="Somos Padel">
+
+                <h1
+                    style="color: white; font-weight: 900; font-size: 1.4rem; margin: 0 0 5px 0; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">
+                    ACCESO JUGADORES
+                </h1>
+                <p
+                    style="color: #CCFF00; font-size: 0.75rem; font-weight: 800; margin: 0; letter-spacing: 1px; text-transform: uppercase;">
+                    App Somospadel BCN
+                </p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" style="width: 100%;">
+
+                <!-- Phone Input -->
+                <div style="margin-bottom: 20px;">
+                    <label
+                        style="display: block; color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 800; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Teléfono de acceso
+                    </label>
+                    <input type="text" name="phone" placeholder="Tu usuario o Teléfono" class="clean-input" required
+                        autocomplete="username"
+                        style="width: 100%; height: 50px; background: #eff6ff; border: 2px solid transparent; border-radius: 12px; color: #0f172a; padding: 0 18px; font-weight: 600; font-size: 0.95rem; transition: all 0.3s; font-family: 'Outfit';">
+                </div>
+
+                <!-- Password Input -->
+                <div style="margin-bottom: 16px;">
+                    <label
+                        style="display: block; color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 800; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Clave de seguridad
+                    </label>
+                    <div style="position: relative;">
+                        <input type="password" name="password" id="login-password-input" placeholder="•••••"
+                            class="clean-input" required autocomplete="current-password"
+                            style="width: 100%; height: 50px; background: #eff6ff; border: 2px solid transparent; border-radius: 12px; color: #0f172a; padding: 0 50px 0 18px; font-weight: 600; font-size: 0.95rem; transition: all 0.3s; font-family: 'Outfit';">
+                        <i class="fas fa-eye" id="toggle-password"
+                            onclick="const i=document.getElementById('login-password-input'); const isPassword = i.type==='password'; i.type = isPassword ? 'text' : 'password'; this.classList.toggle('fa-eye'); this.classList.toggle('fa-eye-slash');"
+                            style="position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #64748b; cursor: pointer; font-size: 1.1rem;"></i>
+                    </div>
+                </div>
+
+                <!-- Show Password Checkbox -->
+                <div style="margin-bottom: 30px; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="show-password-check" class="custom-checkbox"
+                        onclick="const pwd = document.getElementById('login-password-input'); const icon = document.getElementById('toggle-password'); const isChecked = this.checked; pwd.type = isChecked ? 'text' : 'password'; icon.className = isChecked ? 'fas fa-eye-slash' : 'fas fa-eye';">
+                    <label for="show-password-check"
+                        style="color: rgba(255,255,255,0.6); font-size: 0.85rem; cursor: pointer; user-select: none; font-weight: 600;">
+                        Mostrar contraseña
+                    </label>
+                </div>
+
+                <!-- Main CTA Button -->
+                <button type="submit" class="neon-btn"
+                    style="width: 100%; height: 56px; background: #CCFF00; color: #0a0a0a; border: none; border-radius: 14px; font-weight: 950; font-size: 1.1rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(204, 255, 0, 0.2); display: flex; align-items: center; justify-content: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Outfit';">
+                    ENTRAR A LA APP 🚀
+                </button>
+
+                <!-- Footer Links -->
+                <div style="margin-top: 35px; text-align: center;">
+                    <a href="presentation.html" target="_blank"
+                        style="color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px; border: 1px solid rgba(255,255,255,0.2); border-radius: 30px; background: rgba(255,255,255,0.05); transition: all 0.2s;">
+                        <i class="fas fa-microchip"></i> Conoce nuestra tecnología
+                    </a>
+                </div>
+
+                <div style="text-align: center; margin-top: 25px;">
+                    <span style="color: rgba(255,255,255,0.5); font-size: 0.9rem; font-weight: 500;">¿Eres nuevo?</span>
+                    <a href="#" class="auth-switch-link"
+                        style="color: #CCFF00; font-weight: 800; text-decoration: none; margin-left: 5px; font-size: 0.9rem;"
+                        onclick="toggleAuthMode('register')">
+                        Crear cuenta pro
+                    </a>
+                </div>
+            </form>
+
+            <!-- Register Form (Hidden) -->
+            <form id="register-form" class="hidden" style="width: 100%; animation: fadeInUp 0.4s;">
+                <h2
+                    style="color: white; text-align: center; margin-bottom: 25px; font-weight: 800; font-size: 1.3rem; font-family: 'Outfit';">
+                    REGISTRO JUGADOR
+                </h2>
+
+                <div style="margin-bottom: 15px;">
+                    <input type="text" name="name" placeholder="Nombre Completo" class="clean-input" required
+                        style="width: 100%; height: 50px; background: white; border: 2px solid transparent; border-radius: 12px; color: #0a0a0a; padding: 0 18px; font-weight: 500;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+                    <input type="text" name="phone" placeholder="Móvil" class="clean-input" required
+                        style="height: 50px; background: white; border: 2px solid transparent; border-radius: 12px; color: #0a0a0a; padding: 0 18px; font-weight: 500;">
+                    <input type="password" name="password" placeholder="Clave" class="clean-input" required
+                        style="height: 50px; background: white; border: 2px solid transparent; border-radius: 12px; color: #0a0a0a; padding: 0 18px; font-weight: 500;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px;">
+                    <input type="number" name="self_rate_level" step="0.1" min="0" max="7" value="3.5"
+                        class="clean-input" required placeholder="Nivel (0-7)"
+                        style="height: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: white; padding: 0 15px; font-weight: 600;">
+                    <select name="gender" class="clean-input"
+                        style="height: 50px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: white; padding: 0 15px; font-weight: 600;">
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="neon-btn"
+                    style="width: 100%; height: 56px; background: #CCFF00; color: #0a0a0a; border: none; border-radius: 14px; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(204, 255, 0, 0.3); text-transform: uppercase; letter-spacing: 0.5px;">
+                    EMPEZAR A JUGAR
+                </button>
+
+                <div style="margin-top: 25px; text-align: center;">
+                    <a href="#" style="color: rgba(255,255,255,0.6); font-size: 0.85rem; text-decoration: none;"
+                        onclick="toggleAuthMode('login')">
+                        <i class="fas fa-chevron-left" style="margin-right: 5px;"></i> Volver
+                    </a>
+                </div>
+            </form>
+
+            <!-- Brand Signature -->
+            <div
+                style="text-align: center; margin-top: 35px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <span
+                    style="font-family: 'Montserrat', sans-serif; font-weight: 400; font-size: 0.7rem; letter-spacing: 1px; color: rgba(255,255,255,0.4);">Somospadel
+                    BCN</span>
+                <span
+                    style="font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 0.7rem; letter-spacing: 1px; color: #CCFF00; margin-left: 3px;">2026</span>
+            </div>
+        </div>
+    </div>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/firebase-init.js"></script>
+
+    <!-- Layer 2: Core Services -->
+    <script src="js/core/StateManager.js"></script>
+    <script src="js/core/CacheService.js"></script>
+    <script src="js/core/DatabaseService.js"></script>
+    <script src="js/core/AuthService.js?v=12.1"></script>
+    <script src="js/core/Router.js?v=5.7"></script>
+    <script src="js/core/SmartTicker.js"></script>
+
+    <!-- Layer 3: Logic Business -->
+    <script src="js/modules/common/StandingsService.js"></script>
+    <script src="js/modules/common/EventService.js"></script>
+    <script src="js/modules/common/ParticipantService.js"></script>
+    <script src="js/modules/common/LevelService.js"></script>
+    <script src="js/modules/common/ShuffleAnimator.js"></script>
+    <!-- NOTIFICATIONS -->
+    <script src="js/modules/common/NotificationService.js?v=1.1"></script>
+    <script src="js/modules/ui/NotificationUi.js"></script>
+    <script src="js/modules/logic/MatchMakingService.js?v=5011"></script>
+    <script src="js/modules/americanas/AmericanaLogic.js"></script>
+    <script src="js/modules/americanas/AmericanaService.js?v=1013"></script>
+    <script src="js/modules/common/WhatsAppService.js?v=7.0" charset="UTF-8"></script>
+    <script src="js/fixed-pairs-logic.js"></script>
+    <script src="js/rotating-pozo-logic.js"></script>
+    <script src="js/modules/logic/LevelAdjustmentService.js"></script>
+    <script src="js/modules/auth/AuthController.js?v=12.1"></script>
+    <script src="js/modules/common/PartnerSynergyService.js"></script>
+    <script src="js/modules/common/PartnerSynergyWidget.js"></script>
+    <script src="js/modules/core/NetworkPulseService.js"></script>
+    <script src="js/modules/dashboard/NetworkPulseWidget.js"></script>
+
+    <!-- Layer 4: Views & controllers -->
+    <!-- Dashboard Components (NEW) -->
+    <script src="js/modules/common/WeatherService.js"></script>
+    <script src="js/modules/dashboard/HeroCard.js"></script>
+    <script src="js/modules/dashboard/QuickStats.js"></script>
+    <script src="js/modules/dashboard/ActionGrid.js"></script>
+    <script src="js/modules/dashboard/StoryFeedWidget.js?v=5"></script>
+    <script src="js/modules/dashboard/DashboardView.js?v=1026"></script>
+    <script src="js/modules/dashboard/DashboardController.js"></script>
+    <script src="js/modules/players/PlayerView.js?v=400"></script>
+    <script src="js/modules/players/PlayerController.js?v=400"></script>
+    <script src="js/modules/americanas/ControlTowerStandings.js"></script>
+    <script src="js/modules/americanas/ControlTowerStats.js"></script>
+    <script src="js/modules/americanas/ControlTowerReport.js"></script>
+    <script src="js/modules/americanas/ControlTowerView.js?v=4038"></script>
+    <script src="js/modules/americanas/TVView.js?v=2.0"></script>
+    <script src="js/modules/chat/ChatService.js?v=1.1"></script>
+    <script src="js/modules/chat/ChatView.js?v=1.1"></script>
+    <script src="js/modules/americanas/EntrenoLiveView.js"></script>
+    <script src="js/modules/americanas/EventsController_V6.js?v=9.4"></script>
+    <script src="js/modules/common/SocialShareService.js"></script>
+    <script src="js/modules/admin/SocialShareView.js"></script>
+
+    <!-- CAPTAIN SOMOSPADEL (AI COACH) -->
+    <script src="js/modules/captain/CaptainService.js"></script>
+    <script src="js/modules/captain/CaptainView.js"></script>
+
+    <!-- UI Components -->
+    <script src="js/modules/ui/PlayerAutocomplete.js"></script>
+
+    <!-- Ranking Module -->
+    <script src="js/modules/ranking/RankingView.js"></script>
+    <script src="js/modules/ranking/RankingController.js"></script>
+
+    <!-- Hall of Fame (Records) Module -->
+    <script src="js/modules/records/RecordsView.js?v=2"></script>
+    <script src="js/modules/records/RecordsController.js?v=2"></script>
+
+    <!-- Stats Module -->
+    <script src="js/modules/stats/StatsView.js"></script>
+    <script src="js/modules/stats/StatsController.js"></script>
+
+    <!-- Agenda Module -->
+    <script src="js/modules/agenda/AgendaView.js"></script>
+    <script src="js/modules/agenda/AgendaController.js"></script>
+
+    <!-- Entry Point -->
+    <script src="js/app.js?v=2026"></script>
+
+    <!-- PWA Service Worker Registration & Intelligent Updates -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            let registration;
+
+            // 1. Registro inicial
+            window.addEventListener('load', async () => {
+                try {
+                    registration = await navigator.serviceWorker.register('./sw.js');
+                    console.log('✅ Service Worker activo:', registration.scope);
+
+                    // Escuchar actualizaciones encontradas
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                showUpdateToast(registration);
+                            }
+                        });
+                    });
+
+                    // Forzar check de actualización cada vez que se abre la app
+                    registration.update();
+
+                } catch (error) {
+                    console.log('❌ Error Service Worker:', error);
+                }
+            });
+
+            // 2. Recargar página cuando el nuevo SW tome el control
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    window.location.reload();
+                    refreshing = true;
+                }
+            });
+
+            // 3. UI de actualización (Toast Neón)
+            function showUpdateToast(reg) {
+                // Solo mostrar si NotificationService está listo para usar su sistema de toasts
+                if (window.NotificationService) {
+                    const updateContainer = document.createElement('div');
+                    updateContainer.id = 'pwa-update-banner';
+                    updateContainer.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        z-index: 1000000;
+                        background: #000;
+                        border: 2px solid #CCFF00;
+                        padding: 15px 25px;
+                        border-radius: 50px;
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                        box-shadow: 0 0 30px rgba(204,255,0,0.4);
+                        animation: slideDownUpdate 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    `;
+
+                    updateContainer.innerHTML = `
+                        <div style="width:10px; height:10px; background:#CCFF00; border-radius:50%; animation: pulse 1s infinite;"></div>
+                        <span style="color:white; font-weight:800; font-size:0.8rem; font-family:'Outfit';">NUEVA VERSIÓN DISPONIBLE</span>
+                        <button id="pwa-refresh-btn" style="background:#CCFF00; color:#000; border:none; padding:8px 18px; border-radius:20px; font-weight:900; font-size:0.75rem; cursor:pointer; text-transform:uppercase;">ACTUALIZAR</button>
+                    `;
+
+                    if (!document.getElementById('pwa-anim')) {
+                        const s = document.createElement('style');
+                        s.id = 'pwa-anim';
+                        s.textContent = `@keyframes slideDownUpdate { from { transform: translateX(-50%) translateY(-100px); opacity:0; } to { transform: translateX(-50%) translateY(0); opacity:1; } }`;
+                        document.head.appendChild(s);
+                    }
+
+                    document.body.appendChild(updateContainer);
+
+                    document.getElementById('pwa-refresh-btn').onclick = () => {
+                        if (reg.waiting) {
+                            reg.waiting.postMessage('skipWaiting');
+                        }
+                    };
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

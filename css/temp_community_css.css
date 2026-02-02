@@ -1,0 +1,184 @@
+/* --- COMMUNITY STYLE DASHBOARD (Black & Neon) --- */
+
+/* CARD OVERRIDES */
+.hero-v2 {
+    padding: 24px;
+    border-radius: 24px;
+    box-shadow: var(--shadow-float);
+    border: none;
+}
+
+/* BLACK HERO CARD (Stats Style) */
+.hero-v2.community-stats {
+    background: var(--brand-navy);
+    color: white;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.level-circle-container {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--brand-neon);
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(204, 255, 0, 0.2);
+}
+
+.level-number {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: white;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-label {
+    color: #9CA3AF;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.stat-val {
+    font-size: 1.2rem;
+    font-weight: 800;
+    font-family: var(--font-heading);
+    color: white;
+}
+
+.stat-val.neon {
+    color: var(--brand-neon);
+}
+
+/* GRID ACTION CARDS */
+.action-grid-v2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.action-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.1s;
+    cursor: pointer;
+    border: 1px solid transparent;
+    /* Prevent jump on hover */
+    height: 140px;
+    /* Fixed Height */
+}
+
+.action-card:active {
+    transform: scale(0.96);
+}
+
+.action-card.highlight {
+    border: 2px solid var(--brand-neon);
+    position: relative;
+    overflow: hidden;
+}
+
+.action-icon-circle {
+    width: 48px;
+    height: 48px;
+    background: #f3f4f6;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--brand-navy);
+}
+
+.action-card.highlight .action-icon-circle {
+    background: var(--brand-neon);
+    color: var(--brand-navy);
+    box-shadow: 0 4px 10px rgba(204, 255, 0, 0.4);
+}
+
+.action-label {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--brand-navy);
+    line-height: 1.2;
+}
+
+.action-sub {
+    font-size: 0.7rem;
+    color: #10B981;
+    /* Success Green */
+    font-weight: 700;
+}
+
+/* MARQUEE WIDGET (Top Ticker) */
+.ticker-wrap {
+    width: 100%;
+    overflow: hidden;
+    background: var(--brand-navy);
+    color: white;
+    padding: 8px 0;
+    white-space: nowrap;
+    box-sizing: border-box;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: -16px;
+    /* Tuck under header */
+    position: relative;
+    z-index: 90;
+}
+
+.ticker-content {
+    display: inline-block;
+    padding-left: 100%;
+    animation: ticker 20s linear infinite;
+}
+
+@keyframes ticker {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+
+    100% {
+        transform: translate3d(-100%, 0, 0);
+    }
+}
+
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 40px;
+}
+
+.ticker-badge {
+    background: var(--brand-red);
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 800;
+}

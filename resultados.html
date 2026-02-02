@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados - Americanas</title>
+    <link rel="stylesheet" href="css/theme-playtomic.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="js/security-core.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body style="background: #f0f2f5; margin: 0; padding: 20px; font-family: 'Outfit', sans-serif;">
+    <div id="app">
+        <div style="text-align: center; padding: 60px 20px;">
+            <div class="loader"></div>
+            <p style="margin-top: 20px; color: #666;">Cargando resultados...</p>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script>
+        // Initialize Firebase manually to avoid auth errors
+        if (!firebase.apps.length) {
+            firebase.initializeApp(window.FIREBASE_CONFIG || window.firebaseConfig);
+        }
+        window.db = firebase.firestore();
+        console.log("✅ Firebase initialized for results page");
+    </script>
+
+    <script>
+        // Get event ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const eventId = urlParams.get('id');
+
+        // Wait for Firebase to be ready
+        function waitForFirebase(callback) {
+            if (window.db && typeof window.db.collection === 'function') {
+                console.log("✅ Firebase ready");
+                callback();
+            } else {
+                console.log("⏳ Waiting for Firebase...");
+                setTimeout(() => waitForFirebase(callback), 100);
+            }
+        }
+
+        if (!eventId) {
+            document.getElementById('app').innerHTML = `
+                <div style="text-align: center; padding: 60px 20px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ff6b6b;"></i>
+                    <h2>No se especificó un evento</h2>
+                    <button onclick="window.location.href='index.html'" style="margin-top: 20px; padding: 12px 24px; background: #CCFF00; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                        Volver al inicio
+                    </button>
+                </div>
+            `;
+        } else {
+            waitForFirebase(() => {
+                loadEventResults(eventId);
+            });
+        }
+
+        async function loadEventResults(eventId) {
+            try {
+                console.log("📊 Loading results for event:", eventId);
+
+                // Try americana first
+                let eventDoc = await window.db.collection('americanas').doc(eventId).get();
+                let isEntreno = false;
+
+                if (!eventDoc.exists) {
+                    eventDoc = await window.db.collection('entrenos').doc(eventId).get();
+                    isEntreno = true;
+                }
+
+                if (!eventDoc.exists) {
+                    throw new Error('Evento no encontrado');
+                }
+
+                const eventData = { id: eventDoc.id, ...eventDoc.data(), isEntreno };
+
+                // Load matches
+                const matchesCollection = isEntreno ? 'entrenos_matches' : 'matches';
+                const matchesSnapshot = await window.db.collection(matchesCollection)
+                    .where('americana_id', '==', eventId)
+                    .get();
+
+                const matches = matchesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                renderResults(eventData, matches);
+            } catch (error) {
+                console.error("Error loading results:", error);
+                document.getElementById('app').innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #ff6b6b;"></i>
+                        <h2>Error al cargar resultados</h2>
+                        <p style="color: #666;">${error.message}</p>
+                        <button onclick="window.location.href='index.html'" style="margin-top: 20px; padding: 12px 24px; background: #CCFF00; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                            Volver al inicio
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderResults(event, matches) {
+            const isEntreno = event.isEntreno;
+            const finishedMatches = matches.filter(m =>
+                m.status === 'finished' || (parseInt(m.score_a || 0) + parseInt(m.score_b || 0)) > 0
+            );
+
+            if (finishedMatches.length === 0) {
+                document.getElementById('app').innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px;">
+                        <i class="fas fa-info-circle" style="font-size: 3rem; color: #3b82f6;"></i>
+                        <h2>Sin resultados disponibles</h2>
+                        <p style="color: #666;">Este evento aún no tiene partidos finalizados.</p>
+                        <button onclick="window.location.href='index.html'" style="margin-top: 20px; padding: 12px 24px; background: #CCFF00; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                            Volver al inicio
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Calculate stats
+            const players = {};
+            finishedMatches.forEach(m => {
+                const namesA = Array.isArray(m.team_a_names) ? m.team_a_names : [m.team_a_names];
+                const namesB = Array.isArray(m.team_b_names) ? m.team_b_names : [m.team_b_names];
+                const sA = parseInt(m.score_a || 0);
+                const sB = parseInt(m.score_b || 0);
+
+                [...namesA, ...namesB].forEach(name => {
+                    if (!name) return;
+                    if (!players[name]) {
+                        players[name] = { name, games: 0, wins: 0, matches: 0, losses: 0 };
+                    }
+                });
+
+                namesA.forEach(n => {
+                    if (!n) return;
+                    players[n].games += sA;
+                    players[n].matches++;
+                    if (sA > sB) players[n].wins++; else players[n].losses++;
+                });
+
+                namesB.forEach(n => {
+                    if (!n) return;
+                    players[n].games += sB;
+                    players[n].matches++;
+                    if (sB > sA) players[n].wins++; else players[n].losses++;
+                });
+            });
+
+            const sortedPlayers = Object.values(players).sort((a, b) => b.games - a.games);
+            const mvp = sortedPlayers[0] || { name: 'N/A', games: 0 };
+
+            document.getElementById('app').innerHTML = `
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <!-- Header -->
+                    <div style="background: white; border-radius: 20px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <button onclick="window.location.href='index.html'" style="background: transparent; border: none; color: #666; cursor: pointer; margin-bottom: 15px;">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </button>
+                        <h1 style="margin: 0; font-size: 1.8rem; font-weight: 900;">${event.name || 'Evento'}</h1>
+                        <p style="color: #666; margin: 5px 0 0 0;">${event.date || ''} • ${isEntreno ? 'Entreno' : 'Americana'}</p>
+                    </div>
+
+                    <!-- MVP -->
+                    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 20px; padding: 30px; margin-bottom: 20px; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <div style="width: 70px; height: 70px; background: #CCFF00; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 900; color: black;">
+                                ${mvp.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div style="font-size: 0.7rem; color: #CCFF00; font-weight: 800; letter-spacing: 1px;">MVP DEL TORNEO</div>
+                                <h2 style="margin: 5px 0; font-size: 1.6rem;">${mvp.name}</h2>
+                                <div style="color: rgba(255,255,255,0.7);">${mvp.games} puntos • ${mvp.wins} victorias</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ranking -->
+                    <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="margin: 0 0 20px 0; font-size: 1.2rem; font-weight: 900;">Clasificación Final</h3>
+                        ${sortedPlayers.map((p, i) => `
+                            <div style="display: flex; align-items: center; padding: 15px; border-bottom: ${i === sortedPlayers.length - 1 ? 'none' : '1px solid #f0f0f0'};">
+                                <div style="width: 40px; font-size: 1.2rem; font-weight: 900; color: ${i < 3 ? '#CCFF00' : '#999'};">
+                                    ${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                                </div>
+                                <div style="flex: 1; font-weight: 700;">${p.name}</div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 1.2rem; font-weight: 900;">${p.games}</div>
+                                    <div style="font-size: 0.7rem; color: #666;">${p.wins}V - ${p.losses}D</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Matches -->
+                    <div style="background: white; border-radius: 20px; padding: 25px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="margin: 0 0 20px 0; font-size: 1.2rem; font-weight: 900;">Partidos (${finishedMatches.length})</h3>
+                        ${finishedMatches.slice(0, 10).map(m => {
+                const sA = parseInt(m.score_a || 0);
+                const sB = parseInt(m.score_b || 0);
+                const namesA = Array.isArray(m.team_a_names) ? m.team_a_names.join(' / ') : m.team_a_names;
+                const namesB = Array.isArray(m.team_b_names) ? m.team_b_names.join(' / ') : m.team_b_names;
+                return `
+                                <div style="padding: 12px 0; border-bottom: 1px solid #f5f5f5;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                        <span style="font-weight: ${sA > sB ? '900' : '600'};">${namesA || 'Equipo A'}</span>
+                                        <span style="font-size: 1.2rem; font-weight: 900; color: ${sA > sB ? '#CCFF00' : '#999'};">${sA}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-weight: ${sB > sA ? '900' : '600'};">${namesB || 'Equipo B'}</span>
+                                        <span style="font-size: 1.2rem; font-weight: 900; color: ${sB > sA ? '#CCFF00' : '#999'};">${sB}</span>
+                                    </div>
+                                </div>
+                            `;
+            }).join('')}
+                        ${finishedMatches.length > 10 ? `<p style="text-align: center; color: #666; margin-top: 15px;">Y ${finishedMatches.length - 10} partidos más...</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+
+</html>

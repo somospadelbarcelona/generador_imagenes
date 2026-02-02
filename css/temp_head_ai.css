@@ -1,0 +1,105 @@
+/* --- AI COMPANION "HEAD" (Floating Global) --- */
+.ai-assistant-container {
+    position: fixed;
+    /* Global positioning */
+    top: 120px;
+    /* Start position */
+    right: 20px;
+    z-index: 999;
+    /* Above everything */
+    display: flex;
+    flex-direction: row-reverse;
+    /* Bubble to the left of racket */
+    align-items: center;
+    pointer-events: none;
+    /* Let clicks pass through unless on image */
+    animation: wanderFloat 20s ease-in-out infinite alternate;
+    /* Move around */
+}
+
+/* Make the racket image clickable */
+.ai-racket-img {
+    width: 70px;
+    /* Larger to see details */
+    height: 70px;
+    border-radius: 50%;
+    /* Keep circular avatar style or remove for full shape? user said "fondo transparente", circular is safer for bg blending if not png  */
+    /* If the image has black bg, this border-radius keeps it neat. 
+       If we want "full shape", we'd need a truly transparent PNG or mix-blend-mode. 
+       Let's try a cool "Portal" effect. */
+    border: 2px solid var(--brand-neon);
+    box-shadow: 0 0 20px rgba(204, 255, 0, 0.3);
+    overflow: hidden;
+    background: #000;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.ai-racket-img:hover {
+    transform: scale(1.2) rotate(-10deg);
+    box-shadow: 0 0 30px var(--brand-neon);
+}
+
+.ai-racket-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.2);
+    /* Zoom in to racket face */
+}
+
+/* Thought Bubble (Adjusted for Fixed Position) */
+.ai-thought-bubble {
+    position: absolute;
+    right: 75px;
+    /* To the left of racket */
+    top: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--brand-navy);
+    padding: 10px 14px;
+    border-radius: 16px;
+    border-top-right-radius: 2px;
+    /* Point to racket */
+    font-size: 0.8rem;
+    font-weight: 700;
+    width: 160px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateX(10px) scale(0.9);
+    transition: all 0.4s ease;
+    pointer-events: auto;
+}
+
+.ai-thought-bubble.show {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+/* Animation: Wander around the screen slightly */
+@keyframes wanderFloat {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    25% {
+        transform: translate(-10px, 30px);
+    }
+
+    50% {
+        transform: translate(5px, 60px);
+    }
+
+    75% {
+        transform: translate(-5px, 20px);
+    }
+
+    100% {
+        transform: translate(0, 0);
+    }
+}
+
+/* Hide old static header container if exists */
+.cmd-bar .floating-ball-container {
+    display: none;
+}

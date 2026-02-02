@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Función auxiliar para verificar si el usuario es Admin
+    function isAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/players/$(request.auth.uid)).data.role in ['admin', 'admin_player'];
+    }
+
+    // REGLAS PARA JUGADORES (PLAYERS)
+    match /players/{playerId} {
+      // Permitimos lectura para que el sistema de login (por teléfono) pueda encontrar al usuario
+      // IMPORTANTE: Asegúrate de no guardar datos ultra-sensibles aquí fuera de lo necesario.
+      allow read: if true; 
+      
+      // Solo el propio jugador o un admin pueden editar sus datos
+                      // PERO permitimos que otros usuarios ESCRIBAN notificaciones (append-only)
+      allow write: if request.auth != null && (request.auth.uid == playerId || isAdmin());
+      
+      match /notifications/{notificationId} {
+          allow read: if request.auth != null && (request.auth.uid == playerId || isAdmin());
+          // Permitir CREAR notificaciones a cualquier usuario autenticado (para avisos de chat/partidos)
+          allow create: if request.auth != null;
+          // Modificar/Borrar solo el dueño
+          allow update, delete: if request.auth != null && (request.auth.uid == playerId || isAdmin());
+      }
+    }
+
+    // REGLAS PARA EVENTOS (AMERICANAS Y ENTRENOS)
+    match /{collection}/{eventId} {
+      allow read: if request.auth != null;
+      
+      // Solo administradores pueden crear, borrar o modificar eventos
+      allow write: if isAdmin();
+      
+      // Excepción: Los usuarios pueden inscribirse (añadirse a la lista de players)
+      // si el evento está abierto.
+      allow update: if request.auth != null && 
+                    resource.data.status == 'open' &&
+                    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players', 'registeredPlayers', 'waitlist']));
+    }
+
+    // REGLAS PARA PARTIDOS (MATCHES)
+    match /matches/{matchId} {
+      allow read: if request.auth != null;
+      
+      // Solo admins pueden crear/borrar partidos. 
+      // Los jugadores pueden actualizar resultados si el evento está 'live'.
+      allow create, delete: if isAdmin();
+      allow update: if request.auth != null;
+    }
+    
+    match /entrenos_matches/{matchId} {
+      allow read: if request.auth != null;
+      allow create, delete: if isAdmin();
+      allow update: if request.auth != null;
+    }
+
+    // REGLAS PARA EL MENÚ Y CONFIGURACIÓN
+    match /menu_items/{itemId} {
+      allow read: if true; // El menú es público para que el router funcione
+      allow write: if isAdmin();
+    }
+    
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // REGLAS PARA CHATS (MENSAJERÍA TÁCTICA)
+    match /chats/{eventId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null; // Para señales SOS
+
+      match /messages/{messageId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        // Solo admins pueden borrar mensajes ofensivos
+        allow delete: if isAdmin();
+        // Los usuarios pueden editar/borrar SUS PROPIOS mensajes si fuera necesario
+        allow update: if request.auth != null && 
+                      (resource.data.senderId == request.auth.uid || isAdmin());
+      }
+    }
+  }
+}

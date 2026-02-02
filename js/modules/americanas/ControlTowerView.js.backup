@@ -1,0 +1,1698 @@
+/**
+ * ControlTowerView.js
+ * The dedicated view for managing the live Americana.
+ * Replicates the "Official Tournament" screen with Playtomic premium aesthetics.
+ */
+(function () {
+    class ControlTowerView {
+        constructor() {
+            this.mainSection = 'playing'; // 'playing', 'history', 'help'
+            this.activeTab = 'results'; // 'results', 'standings', 'summary'
+            this.selectedRound = 1;
+            this.allMatches = [];
+            this.currentAmericanaId = null;
+            this.currentAmericanaDoc = null;
+            this.userHistory = [];
+            this.unsubscribeMatches = null;
+            this.unsubscribeEvent = null;
+            this.pendingId = null;
+            this.userMatches = [];
+            this.userStats = {
+                games: 0,
+                wins: 0,
+                mvps: 0 // Placeholder for future logic
+            };
+        }
+
+        goToRound(n, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const num = parseInt(n);
+            console.log("🚀 [TowerExpert] Navegando a ronda:", num);
+            this.selectedRound = num;
+            this.recalc();
+        }
+
+        prepareLoad(id) {
+            console.log("🚀 [ControlTowerView] Preparing to load:", id);
+            this.pendingId = id;
+            // Force load immediately to ensure navigation works even if route "flash" happens
+            if (id) this.load(id);
+        }
+
+        handleLiveRoute() {
+            if (this.pendingId) {
+                this.load(this.pendingId);
+                this.pendingId = null;
+            } else {
+                this.loadLatest();
+            }
+        }
+
+        async load(eventId) {
+            this.currentAmericanaId = eventId;
+            this.selectedRound = 1;
+            this.mainSection = 'playing'; // Ensure we show the game area
+
+            // Show loading
+            this.render({ status: 'LOADING' });
+
+            try {
+                // Try to detect if it's an Entreno or Americana
+                // First try Americana
+                let doc = await window.db.collection('americanas').doc(eventId).get();
+                let isEntreno = false;
+
+                if (!doc.exists) {
+                    // If not found, try Entreno
+                    doc = await window.db.collection('entrenos').doc(eventId).get();
+                    isEntreno = true;
+                }
+
+                if (doc.exists) {
+                    this.currentAmericanaDoc = { id: doc.id, ...doc.data(), isEntreno };
+
+                    // UX Improvement: Check status explicitly
+                    if (this.currentAmericanaDoc.status === 'finished') {
+                        this.activeTab = 'summary'; // Go straight to report
+                    } else {
+                        this.activeTab = 'results';
+                    }
+                } else {
+                    console.error("Event not found in either americanas or entrenos:", eventId);
+                    this.renderEmptyState();
+                    return;
+                }
+            } catch (e) {
+                console.error("Error loading event doc:", e);
+            }
+
+            // Unsubscribe previous listeners
+            if (this.unsubscribeMatches) this.unsubscribeMatches();
+            if (this.unsubscribeEvent) this.unsubscribeEvent();
+
+            const isEntreno = this.currentAmericanaDoc?.isEntreno;
+
+            // Real-time listener for EVENT STATUS CHANGES
+            const eventCollection = isEntreno ? 'entrenos' : 'americanas';
+            this.unsubscribeEvent = window.db.collection(eventCollection)
+                .doc(eventId)
+                .onSnapshot(eventDoc => {
+                    if (!eventDoc.exists) return;
+
+                    const updatedEvent = { id: eventDoc.id, ...eventDoc.data(), isEntreno };
+                    const previousStatus = this.currentAmericanaDoc?.status;
+                    this.currentAmericanaDoc = updatedEvent;
+
+                    // AUTO-TRIGGER: If status just changed to 'live', generate matches
+                    // FIX: Ignore if previous status was 'adjusting' (Manual Admin Intervention) to prevent duplicates
+                    if (updatedEvent.status === 'live' && previousStatus !== 'live' && previousStatus !== 'adjusting') {
+                        console.log("🚀 [ControlTowerView] Event status changed to LIVE. Auto-generating matches...");
+                        if (window.AmericanaService) {
+                            window.AmericanaService.generateFirstRoundMatches(eventId, isEntreno ? 'entreno' : 'americana');
+                        }
+                    }
+
+                    if (previousStatus !== updatedEvent.status) {
+                        this.recalc();
+                    }
+                }, err => {
+                    console.error("Error watching event status:", err);
+                });
+
+            // AUTO-START CHECKER (Every 30s)
+            if (this.autoStartInterval) clearInterval(this.autoStartInterval);
+            this.autoStartInterval = setInterval(async () => {
+                const evt = this.currentAmericanaDoc;
+                if (!evt || evt.status !== 'open' || !evt.date || !evt.time) return;
+
+                // Check Time
+                const now = new Date();
+                const [h, m] = evt.time.split(':').map(Number);
+
+                // NORMALIZE DATES (Handle YYYY-MM-DD and DD/MM/YYYY)
+                // We convert both to YYYY-MM-DD for comparison
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                let evtDateNorm = evt.date;
+                if (evt.date.includes('/')) {
+                    // Assume DD/MM/YYYY
+                    const [d, mo, y] = evt.date.split('/');
+                    evtDateNorm = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                }
+
+                // Debug Log (User can see this in console)
+                console.log(`⏰ Auto-Start Check: Today=${todayStr}, Event=${evtDateNorm}, Time=${now.getHours()}:${now.getMinutes()} vs ${h}:${m}`);
+
+                if (evtDateNorm === todayStr) {
+                    const nowTime = now.getHours() * 60 + now.getMinutes();
+                    const schedTime = h * 60 + m;
+
+                    // FULL CHECK: Ensure event is full before auto-start
+                    const players = evt.players || evt.registeredPlayers || [];
+                    const maxCourts = evt.max_courts || 4;
+                    const isFull = players.length >= (maxCourts * 4);
+
+                    // Allow start if time matches OR passed (within last 2 hours to avoid auto-starting old events?)
+                    // Actually, if it's 'open' and time passed, it SHOULD go live.
+                    if (nowTime >= schedTime) {
+                        if (isFull) {
+                            console.log("🚀 AUTO-START TRIGGERED: Changing status to LIVE and Generating Matches");
+                            // 1. Update Status (Trigger listeners)
+                            await window.EventService.updateEvent(isEntreno ? 'entreno' : 'americana', eventId, { status: 'live' });
+
+                            // 2. Force Generation (Redundancy in case listener misses)
+                            if (window.AmericanaService) {
+                                await window.AmericanaService.generateFirstRoundMatches(eventId, isEntreno ? 'entreno' : 'americana');
+                            }
+
+                            // 3. Update Local State immediately
+                            this.currentAmericanaDoc.status = 'live';
+                            this.recalc();
+                        } else {
+                            console.warn(`⏳ [AutoStart] Live View trigger: Time reached but NOT FULL (${players.length}/${maxCourts * 4}). Waiting.`);
+                        }
+                    }
+                }
+            }, 30000); // Check every 30s
+
+            // FIXED: Dynamic collection selection based on Event Type
+            // Entrenos use 'entrenos_matches', Americanas use 'matches'
+            const matchesCollection = isEntreno ? 'entrenos_matches' : 'matches';
+            // NOTE: Both Entrenos and Americanas use 'americana_id' field for consistency in ID reference
+            const fieldName = 'americana_id';
+
+            console.log(`🔍 [ControlTowerView] Loading matches from ${matchesCollection} for event ${eventId} (IsEntreno: ${!!isEntreno})`);
+
+            console.log(`🔍 [ControlTowerView] Loading matches from ${matchesCollection} for event ${eventId}`);
+
+            this.unsubscribeMatches = window.db.collection(matchesCollection)
+                .where(fieldName, '==', eventId)
+                .onSnapshot(snapshot => {
+                    const rawMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                    // CRITICAL FIX: Deduplicate matches by unique signature (court + round + teams)
+                    // This prevents UI duplicates even if Firebase has duplicate documents
+                    const seen = new Map();
+                    const deduplicated = [];
+
+                    rawMatches.forEach(match => {
+                        // Create unique signature based on match characteristics
+                        const teamA = Array.isArray(match.team_a_names) ? match.team_a_names.sort().join('|') : match.team_a_names;
+                        const teamB = Array.isArray(match.team_b_names) ? match.team_b_names.sort().join('|') : match.team_b_names;
+                        const signature = `${match.court}-${match.round}-${teamA}-${teamB}`;
+
+                        if (!seen.has(signature)) {
+                            seen.set(signature, true);
+                            deduplicated.push(match);
+                        } else {
+                            console.warn(`⚠️ [ControlTowerView] Duplicate match detected and filtered: Court ${match.court}, Round ${match.round}`);
+                        }
+                    });
+
+                    this.allMatches = deduplicated;
+                    console.log(`✅ [ControlTowerView] Loaded ${rawMatches.length} matches (${deduplicated.length} unique after deduplication)`);
+
+                    // Safety net & Fullness Trigger: If event is live OR FULL, and NO matches exist, attempt auto-generation
+                    const maxCourts = this.currentAmericanaDoc?.max_courts || 4;
+                    const isFull = (this.currentAmericanaDoc?.players?.length || 0) >= (maxCourts * 4);
+                    const shouldGenerate = (this.currentAmericanaDoc?.status === 'live') || (isFull && this.currentAmericanaDoc?.status === 'open');
+
+                    if (shouldGenerate && this.allMatches.length === 0) {
+                        console.warn("⚠️ Event Trigger (Live or Full) - No matches found. Attempting auto-generation...");
+                        if (window.AmericanaService) {
+                            window.AmericanaService.generateFirstRoundMatches(eventId, isEntreno ? 'entreno' : 'americana');
+                        }
+                    }
+
+                    this.recalc();
+
+                    // CHECK ROUND COMPLETION (Manual Advancement Prompt)
+                    this.checkRoundCompletion(this.allMatches);
+
+                }, err => {
+                    console.error("Error watching matches:", err);
+                });
+        }
+
+        checkRoundCompletion(matches) {
+            if (!this.currentAmericanaDoc) return;
+
+            // 1. Determine Current Round (Max Round existing or specific logic?)
+            // Usually we look at the highest round number present in matches.
+            // But if we are viewing history, we might confuse it.
+            // Let's assume 'Current Round' is the highest round created.
+            if (matches.length === 0) return;
+
+            const maxRound = Math.max(...matches.map(m => parseInt(m.round || 1)));
+
+            // 2. Filter matches for this round
+            const currentRoundMatches = matches.filter(m => parseInt(m.round) === maxRound);
+
+            // 3. Check if ALL are finished
+            const allFinished = currentRoundMatches.every(m => m.status === 'finished');
+
+            if (allFinished && currentRoundMatches.length > 0) {
+                // Check if already prompted/dismissed
+                if (this.roundPromptDismissedFor === maxRound) return;
+
+                // Check if Max Rounds reached (e.g. 6)
+                const totalRounds = this.currentAmericanaDoc.rounds || 6;
+                if (maxRound >= totalRounds) return; // End of Event
+
+                // SHOW PROMPT
+                this.showRoundFinishedModal(maxRound);
+            } else {
+                // Reset dismissal if we somehow went back (unlikely but safe)
+                if (!allFinished) this.roundPromptDismissedFor = null;
+                this.closeRoundFinishedModal();
+            }
+        }
+
+        showRoundFinishedModal(round) {
+            if (document.getElementById('round-finished-modal')) return;
+
+            const modal = document.createElement('div');
+            modal.id = 'round-finished-modal';
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.85); z-index: 13000;
+                display: flex; align-items: center; justify-content: center;
+                backdrop-filter: blur(5px); animation: fadeIn 0.3s ease;
+            `;
+
+            modal.innerHTML = `
+                <div style="background: linear-gradient(135deg, #111 0%, #0a0a0a 100%); width: 90%; max-width: 400px; padding: 30px; border-radius: 24px; border: 2px solid #CCFF00; text-align: center; box-shadow: 0 0 50px rgba(204,255,0,0.2); position: relative;">
+                    <div style="width: 60px; height: 60px; background: #CCFF00; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 0 20px rgba(204,255,0,0.6);">
+                        <i class="fas fa-flag-checkered" style="font-size: 1.8rem; color: black;"></i>
+                    </div>
+                    <h2 style="color: white; font-weight: 950; font-size: 1.5rem; margin: 0 0 10px 0;">RONDA ${round} FINALIZADA</h2>
+                    <p style="color: #bbb; font-size: 0.9rem; margin-bottom: 25px;">Todos los partidos han terminado. ¿Qué quieres hacer?</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <button id="btn-next-round" style="background: #CCFF00; color: black; border: none; padding: 16px; border-radius: 14px; font-weight: 900; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 5px 15px rgba(204,255,0,0.3);">
+                            ✅ SÍ, SIGUIENTE RONDA
+                        </button>
+                        <button id="btn-edit-round" style="background: transparent; color: white; border: 2px solid #333; padding: 14px; border-radius: 14px; font-weight: 800; font-size: 0.9rem; cursor: pointer;">
+                            ❌ NO, QUIERO EDITAR
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Bind Actions
+            document.getElementById('btn-next-round').onclick = async () => {
+                const btn = document.getElementById('btn-next-round');
+                btn.innerHTML = '<div class="loader-spinner"></div> GENERANDO...';
+                try {
+                    const isEntreno = this.currentAmericanaDoc?.isEntreno;
+                    // Trigger Generation
+                    if (window.AmericanaService) {
+                        await window.AmericanaService.generateNextRound(this.currentAmericanaDoc.id, round, isEntreno ? 'entreno' : 'americana');
+                        // Dismiss modal 
+                        this.roundPromptDismissedFor = null; // Reset for next
+                        this.closeRoundFinishedModal();
+                    }
+                } catch (e) {
+                    alert("Error: " + e.message);
+                    btn.innerHTML = '✅ SÍ, SIGUIENTE RONDA';
+                }
+            };
+
+            document.getElementById('btn-edit-round').onclick = () => {
+                this.roundPromptDismissedFor = round;
+                this.closeRoundFinishedModal();
+            };
+        }
+
+        closeRoundFinishedModal() {
+            const el = document.getElementById('round-finished-modal');
+            if (el) el.remove();
+        }
+
+        async loadHistory() {
+            const user = window.Store ? window.Store.getState('currentUser') : null;
+            if (!user) return;
+
+            try {
+                // 1. Fetch Americanas
+                const snap = await window.db.collection('americanas')
+                    .where('players', 'array-contains', user.uid)
+                    .orderBy('date', 'desc')
+                    .get();
+                this.userHistory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // 2. Fetch Matches to calculate real stats
+                const matchSnap = await window.db.collection('matches')
+                    .where('team_a_ids', 'array-contains', user.uid)
+                    .get();
+                const matchSnapB = await window.db.collection('matches')
+                    .where('team_b_ids', 'array-contains', user.uid)
+                    .get();
+
+                this.userMatches = [
+                    ...matchSnap.docs.map(d => d.data()),
+                    ...matchSnapB.docs.map(d => d.data())
+                ];
+
+                // Calculate real games
+                let g = 0;
+                let w = 0;
+                this.userMatches.forEach(m => {
+                    const isTeamA = m.team_a_ids?.includes(user.uid);
+                    const sA = parseInt(m.score_a || 0);
+                    const sB = parseInt(m.score_b || 0);
+
+                    if (isTeamA) {
+                        g += sA;
+                        if (sA > sB) w++;
+                    } else {
+                        g += sB;
+                        if (sB > sA) w++;
+                    }
+                });
+
+                this.userStats = {
+                    games: g,
+                    wins: w,
+                    events: this.userHistory.length
+                };
+
+                this.recalc();
+            } catch (e) {
+                console.error("History fail:", e);
+                // Fallback attempt with registeredPlayers
+                try {
+                    const snap2 = await window.db.collection('americanas')
+                        .where('registeredPlayers', 'array-contains', user.uid)
+                        .get();
+                    this.userHistory = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    this.recalc();
+                } catch (e2) { }
+            }
+        }
+
+        async loadLatest() {
+            this.render({ status: 'LOADING' });
+            try {
+                const user = window.Store ? window.Store.getState('currentUser') : null;
+                const snap = await window.db.collection('americanas')
+                    .orderBy('date', 'desc')
+                    .limit(10)
+                    .get();
+
+                const events = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // Priority: User's, Live, Finished, Latest
+                const myAmericana = user ? events.find(e =>
+                    (e.players && e.players.includes(user.uid)) ||
+                    (e.registeredPlayers && e.registeredPlayers.includes(user.uid))
+                ) : null;
+
+                const target = myAmericana ||
+                    events.find(e => e.status === 'live') ||
+                    // If my Americana is finished, prioritize it too
+                    (user ? events.find(e => e.status === 'finished' && (e.players?.includes(user.uid) || e.registeredPlayers?.includes(user.uid))) : null) ||
+                    events.find(e => e.status === 'finished') ||
+                    events[0];
+
+                if (target) {
+                    this.load(target.id);
+                } else {
+                    this.renderEmptyState();
+                }
+            } catch (e) {
+                console.error("Error loading latest:", e);
+                this.renderEmptyState();
+            }
+        }
+
+        renderEmptyState() {
+            const container = document.getElementById('content-area');
+            if (container) {
+                container.innerHTML = `
+                    <div style="padding: 80px 40px; text-align: center; color: #888; background: white; min-height: 80vh;">
+                        <div style="width: 80px; height: 80px; background: #f8f8f8; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; border: 1px solid #eee;">
+                            <i class="fas fa-trophy" style="font-size: 2.5rem; color: #ddd;"></i>
+                        </div>
+                        <h3 style="color: #111; font-weight: 800; font-family: 'Outfit';">SIN RESULTADOS</h3>
+                        <p style="font-size: 0.95rem; line-height: 1.5; margin-top: 10px;">
+                            No hay Americanas activas para mostrar en este momento.
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        recalc() {
+            // Filtrado de élite: parseInt garantiza que "1", 1 y "1º" coincidan con parseInt(selectedRound)
+            const sNum = parseInt(this.selectedRound) || 1;
+            const currentRoundMatches = this.allMatches.filter(m => {
+                const mNum = parseInt(m.round);
+                return mNum === sNum;
+            });
+
+            console.log(`[Tower] Recalc. Ronda: ${sNum}. Partidos encontrados: ${currentRoundMatches.length} de ${this.allMatches.length}`);
+
+            const roundData = {
+                number: sNum,
+                matches: currentRoundMatches.map(m => {
+                    const namesA = Array.isArray(m.team_a_names) ? m.team_a_names.join(' / ') : (m.team_a_names || 'Equipo A');
+                    const namesB = Array.isArray(m.team_b_names) ? m.team_b_names.join(' / ') : (m.team_b_names || 'Equipo B');
+
+                    return {
+                        court: m.court,
+                        teamA: namesA,
+                        teamB: namesB,
+                        scoreA: m.score_a,
+                        scoreB: m.score_b,
+                        isFinished: m.status === 'finished',
+                        isLive: m.status === 'live',
+                        level_avg: m.level_avg || '3.5',
+                        ...m
+                    };
+                }).sort((a, b) => a.court - b.court)
+            };
+
+            const roundsSchedule = [1, 2, 3, 4, 5, 6].map(r => ({ number: r }));
+
+            this.render({
+                currentRound: roundData,
+                roundsSchedule: roundsSchedule
+            });
+        }
+
+        switchTab(tab) {
+            this.activeTab = tab;
+            this.recalc();
+        }
+
+        switchSection(section) {
+            this.mainSection = section;
+            if (section === 'history') this.loadHistory();
+            this.recalc();
+        }
+
+        render(data) {
+            const container = document.getElementById('content-area');
+            if (!container) return;
+
+            const user = window.Store ? window.Store.getState('currentUser') : null;
+            const isPlayingHere = this.currentAmericanaDoc && user && (
+                (this.currentAmericanaDoc.players || []).includes(user.uid) ||
+                (this.currentAmericanaDoc.registeredPlayers || []).includes(user.uid)
+            );
+
+            // SMART PATCHING (Prevent Flash)
+            if (this.mainSection === 'playing' && this.activeTab === 'results' && document.querySelector('.tour-grid-container')) {
+                const rd = data?.currentRound || { matches: [] };
+                const ar = data?.roundsSchedule || [];
+                // Only smart update if we have matches, otherwise full render might be safer
+                if (this.smartUpdateResults(rd, ar)) {
+                    return;
+                }
+            }
+
+            // --- STATE PRESERVATION ---
+            const scrollPos = window.scrollY;
+            const openEditIds = Array.from(document.querySelectorAll('[id^="edit-actions-"]'))
+                .filter(el => el.style.display !== 'none')
+                .map(el => el.id);
+            // --------------------------
+
+            container.innerHTML = `
+                <div class="tournament-layout fade-in" style="background: #F8F9FA;">
+                    
+                    <!-- NEW SUBMENU STRUCTURE (PREMIUM GLASS) -->
+                    <div style="background: rgba(255,255,255,0.9); backdrop-filter: blur(15px); padding: 12px; display: flex; justify-content: center; gap: 8px; border-bottom: 1px solid rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1002; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                        <button onclick="window.ControlTowerView.switchSection('playing')" style="flex:1; border:none; background: ${this.mainSection === 'playing' ? 'var(--playtomic-neon)' : 'rgba(0,0,0,0.05)'}; color: ${this.mainSection === 'playing' ? 'black' : '#666'}; padding: 12px 6px; border-radius: 8px; font-weight: 900; font-size: 0.6rem; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">EN JUEGO</button>
+                        <button onclick="window.ControlTowerView.switchSection('history')" style="flex:1; border:none; background: ${this.mainSection === 'history' ? 'var(--playtomic-neon)' : 'rgba(0,0,0,0.05)'}; color: ${this.mainSection === 'history' ? 'black' : '#666'}; padding: 12px 6px; border-radius: 8px; font-weight: 900; font-size: 0.6rem; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">MI PASADO</button>
+                        <button onclick="window.ControlTowerView.switchSection('help')" style="flex:1; border:none; background: ${this.mainSection === 'help' ? 'var(--playtomic-neon)' : 'rgba(0,0,0,0.05)'}; color: ${this.mainSection === 'help' ? 'black' : '#666'}; padding: 12px 6px; border-radius: 8px; font-weight: 900; font-size: 0.6rem; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px;">INFO</button>
+                    </div>
+
+                    ${this.renderMainArea(data, isPlayingHere)}
+                </div>
+            `;
+
+            // --- STATE RESTORATION ---
+            if (openEditIds.length > 0) {
+                openEditIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'flex';
+                });
+            }
+            // Restore scroll only if we haven't navigated far (optional, but requested)
+            // But if content height changes, scroll might be wrong. Usually safe for minor updates.
+            if (scrollPos > 0) {
+                window.scrollTo(0, scrollPos);
+            }
+            // --------------------------
+        }
+
+        renderMainArea(data, isPlayingHere) {
+            if (this.mainSection === 'help') return this.renderHelpContent();
+            if (this.mainSection === 'history') return this.renderHistoryContent();
+
+            // DEFAULT: PLAYING AREA
+            const roundData = data?.currentRound || { matches: [] };
+            const amName = this.currentAmericanaDoc ? this.currentAmericanaDoc.name : "Americana Activa";
+
+            return `
+                <div class="tour-header-context" style="background: linear-gradient(135deg, #CCFF00 0%, #00E36D 100%); padding: 35px 20px; text-align: center; border-bottom: 2px solid rgba(0,0,0,0.05);">
+                    ${isPlayingHere ? `
+                        <div style="background: rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.2); color: #000; display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 0.6rem; font-weight: 900; margin-bottom: 15px; letter-spacing: 1px; text-transform: uppercase;">
+                           ESTÁS PARTICIPANDO ✅
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                        <div style="position: relative;">
+                            <img src="${this.currentAmericanaDoc?.image_url || 'img/logo_somospadel.png'}" 
+                                 style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid white; box-shadow: 0 8px 25px rgba(0,0,0,0.2);"
+                                 onerror="this.src='img/logo_somospadel.png'">
+                        </div>
+                        <h1 style="color: #000; margin: 0; font-family: 'Outfit'; font-weight: 900; font-size: 1.5rem; letter-spacing: -0.5px; text-shadow: 0 1px 0 rgba(255,255,255,0.4);">${amName.toUpperCase()}</h1>
+                    </div>
+                    
+                    <div style="color: rgba(0,0,0,0.5); font-size: 0.8rem; margin-top: 8px; font-weight: 800; letter-spacing: 0.5px;">
+                        ${this.currentAmericanaDoc?.date || ''} • ${(this.currentAmericanaDoc?.category === 'male' ? 'MASCULINA' :
+                    this.currentAmericanaDoc?.category === 'female' ? 'FEMENINA' :
+                        this.currentAmericanaDoc?.category === 'mixed' ? 'MIXTA' :
+                            this.currentAmericanaDoc?.category === 'open' ? 'TODOS' : 'PRO')
+                }</div>
+                </div>
+
+                <div class="tour-sub-nav" style="background: rgba(255,255,255,0.8); backdrop-filter: blur(15px); padding: 12px 10px; display: flex; gap: 8px; border-bottom: 2px solid #CCFF00; position: sticky; top: 62px; z-index: 1001; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+                    <button class="tour-menu-item ${this.activeTab === 'results' ? 'active' : ''}" style="flex:1; border-radius: 12px; font-size: 0.65rem; font-weight: 900; background: ${this.activeTab === 'results' ? 'linear-gradient(135deg, #CCFF00 0%, #B8E600 100%)' : '#f0f0f0'}; color: #000; border: none; box-shadow: ${this.activeTab === 'results' ? '0 4px 10px rgba(204,255,0,0.3)' : 'none'}; transition: 0.3s;" onclick="window.ControlTowerView.switchTab('results')">PARTIDOS</button>
+                    <button class="tour-menu-item ${this.activeTab === 'standings' ? 'active' : ''}" style="flex:1; border-radius: 12px; font-size: 0.65rem; font-weight: 900; background: ${this.activeTab === 'standings' ? 'linear-gradient(135deg, #CCFF00 0%, #B8E600 100%)' : '#f0f0f0'}; color: #000; border: none; box-shadow: ${this.activeTab === 'standings' ? '0 4px 10px rgba(204,255,0,0.3)' : 'none'}; transition: 0.3s;" onclick="window.ControlTowerView.switchTab('standings')">POSICIONES</button>
+                    <button class="tour-menu-item ${this.activeTab === 'summary' ? 'active' : ''}" style="flex:1; border-radius: 12px; font-size: 0.65rem; font-weight: 900; background: ${this.activeTab === 'summary' ? 'linear-gradient(135deg, #CCFF00 0%, #B8E600 100%)' : '#f0f0f0'}; color: #000; border: none; box-shadow: ${this.activeTab === 'summary' ? '0 4px 10px rgba(204,255,0,0.3)' : 'none'}; transition: 0.3s;" onclick="window.ControlTowerView.switchTab('summary')">ESTADÍSTICAS</button>
+                </div>
+
+                ${this.renderActiveContent(data, roundData)}
+            `;
+        }
+
+        renderActiveContent(data, roundData) {
+            if (data?.status === 'LOADING') return '<div class="loader" style="margin:80px auto;"></div>';
+
+            switch (this.activeTab) {
+                case 'standings': return this.renderStandingsView();
+                case 'summary': return this.renderSummaryView();
+                default:
+                case 'results': return this.renderResultsView(roundData, data?.roundsSchedule || []);
+            }
+        }
+
+        smartUpdateResults(roundData, allRounds) {
+            if (!document.querySelector('.tour-grid-container')) return false; // Fallback to full render if not found
+
+            // 1. Update Round Tabs (Naive is fine, low interaction)
+            const filterBar = document.querySelector('.tour-filter-bar');
+            if (filterBar) {
+                filterBar.innerHTML = this.renderRoundTabs(allRounds, roundData.number);
+            }
+
+            // 2. Smart Grid Patching
+            const grid = document.querySelector('.tour-grid-container');
+            const matches = roundData.matches;
+
+            if (matches.length === 0) {
+                grid.innerHTML = '<div style="color:#999; width:100%; text-align:center; padding:60px; font-weight:700;">Selecciona una ronda válida...</div>';
+                return true;
+            }
+
+            const validIds = new Set();
+
+            // Insert / Update
+            matches.forEach((match, index) => {
+                validIds.add(match.id);
+                const cardId = `tour-match-${match.id}`;
+                let el = document.getElementById(cardId);
+
+                // Re-generate HTML for the card
+                // Note: Generates whole card HTML. Parsing it to diff is hard.
+                // But we can check if CONTENT changed.
+                // Optimization: Just update Scores and Status if ID exists.
+
+                if (el) {
+                    // Update Status Badge
+                    const statusArea = el.querySelector('.status-area');
+                    const isFinished = match.isFinished;
+                    const isLive = this.currentAmericanaDoc?.status === 'live' && !isFinished;
+                    const newStatusHTML = isFinished ?
+                        '<span style="background: #25D366; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 900; font-size: 0.6rem; letter-spacing: 0.5px;">FINALIZADO</span>' :
+                        (isLive ? '<span class="status-badge-live">⚡ EN JUEGO</span>' : '<span style="color:#BBB;">ESPERANDO</span>');
+
+                    if (statusArea && statusArea.innerHTML !== newStatusHTML) {
+                        statusArea.innerHTML = newStatusHTML;
+                    }
+
+                    // Update Names (Real-time substitution - VACANTE)
+                    const getTeamNameStr = (m, side) => {
+                        const namesArr = m[`team_${side.toLowerCase()}_names`];
+                        const teamStr = m[`team${side.toUpperCase()}`];
+                        if (teamStr && typeof teamStr === 'string' && teamStr.length > 0) return teamStr;
+                        if (Array.isArray(namesArr)) return namesArr.join(' / ');
+                        return String(namesArr || '');
+                    };
+
+                    const nameAStr = getTeamNameStr(match, 'a') || 'JUGADOR A';
+                    const nameBStr = getTeamNameStr(match, 'b') || 'JUGADOR B';
+
+                    const nameAEl = document.getElementById(`match-name-a-${match.id}`);
+                    const nameBEl = document.getElementById(`match-name-b-${match.id}`);
+
+                    if (nameAEl && nameAEl.innerText !== nameAStr) nameAEl.innerText = nameAStr;
+                    if (nameBEl && nameBEl.innerText !== nameBStr) nameBEl.innerText = nameBStr;
+
+                    // Update Scores
+                    const sA = parseInt(match.score_a || 0);
+                    const sB = parseInt(match.score_b || 0);
+
+                    const scoreAEl = document.getElementById(`match-score-a-${match.id}`);
+                    const scoreBEl = document.getElementById(`match-score-b-${match.id}`);
+                    const valAEl = document.getElementById(`score-a-val-${match.id}`);
+                    const valBEl = document.getElementById(`score-b-val-${match.id}`);
+
+                    if (scoreAEl && scoreAEl.innerText != sA) scoreAEl.innerText = sA;
+                    if (scoreBEl && scoreBEl.innerText != sB) scoreBEl.innerText = sB;
+                    if (valAEl && valAEl.innerText != sA) valAEl.innerText = sA;
+                    if (valBEl && valBEl.innerText != sB) valBEl.innerText = sB;
+
+                    // If not focused, we can still re-render action area if status changed
+                    // but usually granular is better.
+                } else {
+                    // Append
+                    // We need to insert in order.
+                    // Naive append:
+                    grid.insertAdjacentHTML('beforeend', this.renderTournamentCard(match));
+                }
+            });
+
+            // Remove old
+            grid.querySelectorAll('.tour-match-card').forEach(card => {
+                // We need to extract ID from card. renderTournamentCard needs to add ID to wrapper.
+                // Currently it doesn't.
+                // I need to modify renderTournamentCard to add ID `id="tour-match-${match.id}"`.
+            });
+
+            // Update Next Round UI
+            // ...
+
+            return true;
+        }
+
+        renderResultsView(roundData, allRounds) {
+            // ... existing ...
+
+            const tabs = this.renderRoundTabs(allRounds, roundData.number);
+
+            // CHECK FOR ROUND COMPLETION
+            const isRoundComplete = roundData.matches.length > 0 && roundData.matches.every(m => m.isFinished);
+            let nextRoundUI = '';
+
+            if (isRoundComplete && this.currentAmericanaDoc?.status === 'live') {
+                nextRoundUI = `
+                    <div id="next-round-btn-container" class="animate-pop-in" style="margin-top: 30px; background: white; padding: 25px; border-radius: 20px; border: 2px solid #CCFF00; box-shadow: 0 10px 30px rgba(204,255,0,0.2); text-align: center;">
+                        <h3 style="margin: 0 0 15px 0; font-weight: 900; font-size: 1.1rem;">🏁 RONDA ${roundData.number} FINALIZADA</h3>
+                        <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">
+                            Todos los resultados han sido introducidos. ¿Deseas generar la siguiente ronda?
+                        </p>
+                        <div style="display: flex; gap: 15px; justify-content: center;">
+                             <button onclick="window.ControlTowerView.triggerNextRound(${roundData.number})" 
+                                    class="btn-primary-pro"
+                                    style="padding: 15px 30px; font-size: 1rem; background: var(--playtomic-neon); color: black; border: none; box-shadow: 0 5px 15px rgba(204,255,0,0.4);">
+                                SI, SIGUIENTE RONDA 🚀
+                            </button>
+                             <button onclick="document.getElementById('next-round-btn-container').innerHTML='<p>Puedes editar los resultados usando el botón ✏️ en cada tarjeta.</p>'; setTimeout(() => window.ControlTowerView.recalc(), 3000);" 
+                                    style="padding: 15px 20px; font-size: 0.9rem; background: #eee; border: none; border-radius: 12px; font-weight: 800; color: #666; cursor: pointer;">
+                                NO, QUIERO EDITAR
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="tour-filter-bar" style="background:#F8F9FA; padding: 12px; overflow-x: auto;">
+                   ${tabs}
+                </div>
+                <div class="tour-grid-container" style="padding: 16px; display: grid; gap: 16px; padding-bottom: 100px;">
+                    ${roundData.matches.length ? '' : '<div style="color:#999; width:100%; text-align:center; padding:60px; font-weight:700;">Selecciona una ronda válida...</div>'}
+                    ${roundData.matches.map(match => this.renderTournamentCard(match)).join('')}
+                    ${nextRoundUI}
+                </div>
+            `;
+        }
+
+        renderRoundTabs(rounds, currentNum) {
+            return `
+                <div class="round-tabs-container" style="display:flex; gap:8px; align-items: center;">
+                    ${rounds.map(r => {
+                const isSel = parseInt(r.number) === parseInt(currentNum);
+                return `
+                        <button type="button" 
+                                class="round-tab ${isSel ? 'active' : ''}" 
+                                onclick="window.ControlTowerView.goToRound(${r.number}, event)"
+                                style="background: ${isSel ? 'var(--playtomic-neon)' : '#222'}; 
+                                       color: ${isSel ? 'black' : '#fff'}; 
+                                       border: 1px solid ${isSel ? 'var(--playtomic-neon)' : '#444'};
+                                       padding: 10px 18px; border-radius: 12px; font-weight: 900; cursor: pointer; transition: 0.3s; min-width: 60px;
+                                       box-shadow: ${isSel ? '0 0 15px rgba(204,255,0,0.3)' : 'none'};">
+                            ${r.number}º
+                        </button>
+                    `}).join('')}
+                </div>
+            `;
+        }
+
+        renderStandingsView() {
+            const stats = {};
+            const isEventFinished = this.currentAmericanaDoc?.status === 'finished';
+            this.allMatches.forEach(m => {
+                const hasScore = (parseInt(m.score_a || 0) + parseInt(m.score_b || 0)) > 0;
+                if (m.status === 'finished' || (isEventFinished && hasScore)) {
+                    const namesA = Array.isArray(m.team_a_names) ? m.team_a_names : [m.team_a_names];
+                    const namesB = Array.isArray(m.team_b_names) ? m.team_b_names : [m.team_b_names];
+                    const sA = parseInt(m.score_a || 0);
+                    const sB = parseInt(m.score_b || 0);
+                    const court = parseInt(m.court || 99);
+
+                    [...namesA, ...namesB].forEach(name => {
+                        if (!name) return;
+                        if (!stats[name]) stats[name] = { name, points: 0, wins: 0, matches: 0, court1Count: 0, bestCourt: 99 };
+                        stats[name].matches++;
+                        // Tracking for tie-breaker
+                        if (court === 1) stats[name].court1Count++;
+                        if (court < stats[name].bestCourt) stats[name].bestCourt = court;
+                    });
+
+                    namesA.forEach(name => { if (name) { stats[name].points += sA; if (sA > sB) stats[name].wins++; } });
+                    namesB.forEach(name => { if (name) { stats[name].points += sB; if (sB > sA) stats[name].wins++; } });
+                }
+            });
+
+            const isEntreno = this.currentAmericanaDoc?.isEntreno;
+            const ranking = Object.values(stats).sort((a, b) => {
+                // Primary: Points (Games in Americana, Match Wins in Entreno via p.points/wins consistency)
+                const diff = b.points - a.points;
+                if (diff !== 0) return diff;
+
+                if (isEntreno) {
+                    // Tie-breaker 1: Most times in Court 1
+                    const c1Diff = b.court1Count - a.court1Count;
+                    if (c1Diff !== 0) return c1Diff;
+                    // Tie-breaker 2: Highest court reached (lower number is better)
+                    return a.bestCourt - b.bestCourt;
+                }
+
+                return b.wins - a.wins;
+            });
+
+            return `
+                <div class="standings-container fade-in" style="padding: 24px; background: white; min-height: 80vh; padding-bottom: 100px;">
+                    <div style="background: #fff; border: 1px solid #eeeff2; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+                        <div style="padding: 18px; background: #fafafa; font-size: 0.65rem; font-weight: 800; color: #999; display: flex; border-bottom: 1px solid #f0f0f0; letter-spacing: 1px;">
+                            <div style="width: 45px;">POS</div>
+                            <div style="flex: 1;">JUGADOR</div>
+                            <div style="width: 50px; text-align: center;">V</div>
+                            <div style="width: 50px; text-align: center;">PTS</div>
+                        </div>
+                        ${ranking.length === 0 ? `
+                             <div style="padding: 60px 20px; text-align: center; color: #ccc;">No hay datos aún.</div>
+                        ` : ranking.map((p, i) => {
+                // Highlight logic
+                let rowStyle = 'background: white;';
+                let posContent = i + 1;
+
+                if (i === 0) { // WINNER
+                    rowStyle = 'background: linear-gradient(90deg, rgba(255,215,0,0.15), rgba(255,255,255,0)); border-left: 5px solid #FFD700;';
+                    posContent = '🏆';
+                } else if (i === 1) { // FINALIST
+                    rowStyle = 'background: linear-gradient(90deg, rgba(192,192,192,0.15), rgba(255,255,255,0)); border-left: 5px solid #C0C0C0;';
+                    posContent = '🥈';
+                } else if (i === 2) {
+                    posContent = '🥉';
+                }
+
+                return `
+                            <div style="padding: 16px 18px; display: flex; align-items: center; border-bottom: 1px solid #f9f9f9; ${rowStyle}">
+                                <div style="width: 45px; font-weight: 900; font-size: 1.1rem; color: ${i < 3 ? '#000' : '#bbb'};">
+                                    ${posContent}
+                                </div>
+                                <div style="flex: 1; font-weight: ${i < 2 ? '900' : '700'}; color: #111; font-size: 0.9rem;">${p.name}</div>
+                                <div style="width: 50px; text-align: center; font-weight: 700; color: #25D366;">${p.wins}</div>
+                                <div style="width: 50px; text-align: center; font-weight: 900; color: #000; font-size: 1.1rem;">${p.points}</div>
+                            </div>
+                        `;
+            }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        renderSummaryView() {
+            let finishedMatches = this.allMatches.filter(m => m.status === 'finished');
+
+            // FALLBACK ROBUSTNESS: If event is finished but matches weren't individually marked 'finished',
+            // use all matches that have scores. This prevents "Calculando..." hang.
+            if (finishedMatches.length === 0 && this.allMatches.length > 0 && this.currentAmericanaDoc?.status === 'finished') {
+                console.warn("⚠️ [Stats] Using fallback for finished matches (scores > 0)");
+                finishedMatches = this.allMatches.filter(m => (parseInt(m.score_a || 0) + parseInt(m.score_b || 0)) > 0);
+            }
+
+            if (finishedMatches.length === 0) {
+                return `
+                    <div style="padding: 100px 20px; text-align: center; color: #999;">
+                        <i class="fas fa-chart-pie" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.2;"></i>
+                        <h3>Sin Datos de Partidos</h3>
+                        <p>No se han encontrado partidos finalizados para generar estadísticas.</p>
+                    </div>`;
+            }
+
+            const isEntreno = this.currentAmericanaDoc?.isEntreno;
+            const isFija = this.currentAmericanaDoc?.is_fija || false;
+
+            // --- Stats Calculation - DIFFERENT LOGIC FOR ENTRENOS vs AMERICANAS ---
+            const players = {};
+            const roundStats = {};
+            let totalGames = 0;
+            let highIntensityMatches = 0;
+
+            if (isEntreno) {
+                // ===== ENTRENO LOGIC: Count MATCH WINS (not games) =====
+                console.log(`📊 [Stats] Calculating ENTRENO stats (${isFija ? 'FIJA' : 'TWISTER'})`);
+
+                finishedMatches.forEach(m => {
+                    const namesA = Array.isArray(m.team_a_names) ? m.team_a_names : [m.team_a_names];
+                    const namesB = Array.isArray(m.team_b_names) ? m.team_b_names : [m.team_b_names];
+                    const winnerA = parseInt(m.score_a || 0) > parseInt(m.score_b || 0);
+                    const winnerB = parseInt(m.score_b || 0) > parseInt(m.score_a || 0);
+
+                    // For Entrenos, we count MATCHES won, not games
+                    totalGames++; // Total matches played
+
+                    if (!roundStats[m.round]) roundStats[m.round] = 0;
+                    roundStats[m.round]++; // Count matches per round
+
+                    // FIJA: Count wins by PAIR (team_a_names and team_b_names are pairs)
+                    const pairA = namesA.join(' / ');
+                    const pairB = namesB.join(' / ');
+                    const court = parseInt(m.court || 99);
+
+                    if (!players[pairA]) players[pairA] = { name: pairA, games: 0, wins: 0, matches: 0, losses: 0, pointsScored: 0, pointsAgainst: 0, court1Count: 0, bestCourt: 99 };
+                    if (!players[pairB]) players[pairB] = { name: pairB, games: 0, wins: 0, matches: 0, losses: 0, pointsScored: 0, pointsAgainst: 0, court1Count: 0, bestCourt: 99 };
+
+                    players[pairA].matches++;
+                    players[pairB].matches++;
+                    if (court === 1) { players[pairA].court1Count++; players[pairB].court1Count++; }
+                    if (court < players[pairA].bestCourt) players[pairA].bestCourt = court;
+                    if (court < players[pairB].bestCourt) players[pairB].bestCourt = court;
+
+                    if (winnerA) {
+                        players[pairA].wins++;
+                        players[pairA].games++; // For Entrenos, "games" = matches won
+                        players[pairB].losses++;
+                    } else if (winnerB) {
+                        players[pairB].wins++;
+                        players[pairB].games++; // For Entrenos, "games" = matches won
+                        players[pairA].losses++;
+                    }
+                } else {
+                    // TWISTER: Count wins by INDIVIDUAL PLAYER
+                    const court = parseInt(m.court || 99);
+                    [...namesA, ...namesB].forEach(name => {
+                        if (!name) return;
+                        if (!players[name]) players[name] = { name, games: 0, wins: 0, matches: 0, losses: 0, pointsScored: 0, pointsAgainst: 0, court1Count: 0, bestCourt: 99 };
+                        if (court === 1) players[name].court1Count++;
+                        if (court < players[name].bestCourt) players[name].bestCourt = court;
+                    });
+
+                    namesA.forEach(n => {
+                        if (!n) return;
+                        players[n].matches++;
+                        if (winnerA) {
+                            players[n].wins++;
+                            players[n].games++; // For Entrenos, "games" = matches won
+                        } else {
+                            players[n].losses++;
+                        }
+                    });
+
+                    namesB.forEach(n => {
+                        if (!n) return;
+                        players[n].matches++;
+                        if (winnerB) {
+                            players[n].wins++;
+                            players[n].games++; // For Entrenos, "games" = matches won
+                        } else {
+                            players[n].losses++;
+                        }
+                    });
+                }
+            });
+
+            // For Entrenos, intensity = close matches (not applicable, set to 0)
+            highIntensityMatches = 0;
+
+        } else {
+        // ===== AMERICANA LOGIC: Count GAMES (original logic) =====
+        console.log(`📊 [Stats] Calculating AMERICANA stats`);
+
+        finishedMatches.forEach(m => {
+            const namesA = Array.isArray(m.team_a_names) ? m.team_a_names : [m.team_a_names];
+            const namesB = Array.isArray(m.team_b_names) ? m.team_b_names : [m.team_b_names];
+            const sA = parseInt(m.score_a || 0);
+            const sB = parseInt(m.score_b || 0);
+
+            totalGames += (sA + sB);
+            if (Math.abs(sA - sB) <= 1) highIntensityMatches++;
+
+            if (!roundStats[m.round]) roundStats[m.round] = 0;
+            roundStats[m.round] += (sA + sB);
+
+            [...namesA, ...namesB].forEach(name => {
+                if (!players[name]) players[name] = { name, games: 0, wins: 0, matches: 0, losses: 0, pointsScored: 0, pointsAgainst: 0, court1Count: 0, bestCourt: 99 };
+                const court = parseInt(m.court || 99);
+                if (court === 1) players[name].court1Count++;
+                if (court < players[name].bestCourt) players[name].bestCourt = court;
+            });
+
+            namesA.forEach(n => {
+                players[n].games += sA; players[n].matches++;
+                players[n].pointsScored += sA; players[n].pointsAgainst += sB;
+                if (sA > sB) players[n].wins++; else players[n].losses++;
+            });
+            namesB.forEach(n => {
+                players[n].games += sB; players[n].matches++;
+                players[n].pointsScored += sB; players[n].pointsAgainst += sA;
+                if (sB > sA) players[n].wins++; else players[n].losses++;
+            });
+        });
+    }
+
+    const sortedPlayers = Object.values(players).sort((a, b) => {
+        const diff = b.games - a.games;
+        if (diff !== 0) return diff;
+
+        if (isEntreno) {
+            // Tie-breaker 1: Court 1 count
+            const c1 = b.court1Count - a.court1Count;
+            if (c1 !== 0) return c1;
+            // Tie-breaker 2: Best court reached
+            return a.bestCourt - b.bestCourt;
+        }
+
+        return b.wins - a.wins;
+    });
+    const top5 = sortedPlayers.slice(0, 5);
+    const intensityPercent = Math.round((finishedMatches.length > 0 ? highIntensityMatches / finishedMatches.length : 0) * 100);
+
+    // --- Advanced Highlights ---
+    const courtGames = {};
+    let bestBlowout = { diff: 0, match: null };
+    finishedMatches.forEach(m => {
+        const diff = Math.abs(parseInt(m.score_a) - parseInt(m.score_b));
+        if (!courtGames[m.court]) courtGames[m.court] = 0;
+        courtGames[m.court] += (parseInt(m.score_a) + parseInt(m.score_b));
+        if (diff > bestBlowout.diff) bestBlowout = { diff, match: m };
+    });
+    const busiestCourtKey = Object.keys(courtGames).reduce((a, b) => courtGames[a] > courtGames[b] ? a : b, 1);
+    const qualityStars = intensityPercent > 80 ? '⭐⭐⭐⭐⭐' : intensityPercent > 50 ? '⭐⭐⭐⭐' : '⭐⭐⭐';
+
+    // GUARDIAN: If no players found (e.g. data issue), show generic
+    const mvp = sortedPlayers.length > 0 ? sortedPlayers[0] : { name: 'N/A', games: 0, wins: 0 };
+    const bestDefense = sortedPlayers.length > 0 ? sortedPlayers.sort((a, b) => a.pointsAgainst - b.pointsAgainst)[0] : { name: '-', pointsAgainst: 0 };
+
+    // --- NEW: Additional Tournament Highlights ---
+    // Invictus: Players with 100% win rate
+    const invictusPlayers = sortedPlayers.filter(p => p.matches > 0 && p.losses === 0);
+
+    // Francotirador: Best single match performance
+    let bestSingleMatch = { player: '-', score: 0 };
+    finishedMatches.forEach(m => {
+        // ... (existing logic logic inside loop was slightly cut in view, need to be careful)
+        const sA = parseInt(m.score_a || 0);
+        const sB = parseInt(m.score_b || 0);
+        const namesA = Array.isArray(m.team_a_names) ? m.team_a_names : [m.team_a_names];
+        const namesB = Array.isArray(m.team_b_names) ? m.team_b_names : [m.team_b_names];
+        const winningScore = Math.max(sA, sB);
+        // Approximation: We don't know exactly who scored without more data, assuming winners
+        // But for "Francotirador" implies high score.
+        if (winningScore > bestSingleMatch.score) {
+            const winners = sA > sB ? namesA : namesB;
+            if (winners[0]) bestSingleMatch = { player: winners[0], score: winningScore };
+        }
+    });
+
+    // --- RENDER UI (Adapted for Mobile) ---
+    const html = `
+                <div class="summary-dashboard animate-fade-in" style="display: flex; flex-direction: column; gap: 1.5rem; padding: 20px; padding-bottom: 120px; background: #f0f2f5;">
+                    
+                    <!-- TOP 3 Clasificación (Real-time admin feel) -->
+                    <div style="background: white; border-radius: 20px; padding: 20px; border: 1px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                         <h3 style="margin:0 0 15px 0; font-weight: 950; font-size: 0.85rem; color: #111; letter-spacing: 1px; text-transform: uppercase;">Podio Final</h3>
+                         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                             <div style="background: #fdfdfd; padding: 10px; border-radius: 12px;">
+                                 <div style="font-size: 1.5rem;">🥈</div>
+                                 <div style="font-weight: 800; font-size: 0.7rem; color: #333; margin-top: 5px;">${sortedPlayers[1]?.name.split(' ')[0] || '-'}</div>
+                                 <div style="font-size: 0.6rem; color: #888;">${sortedPlayers[1]?.games || 0} ${isEntreno ? 'partidos' : 'pts'}</div>
+                             </div>
+                             <div style="background: rgba(204,255,0,0.05); padding: 15px 10px; border-radius: 16px; border: 1px solid rgba(204,255,0,0.2); transform: translateY(-10px);">
+                                 <div style="font-size: 2rem;">🥇</div>
+                                 <div style="font-weight: 950; font-size: 0.8rem; color: #000;">${mvp.name ? mvp.name.split(' ')[0] : 'N/A'}</div>
+                                 <div style="font-size: 0.7rem; font-weight: 800; color: var(--playtomic-neon);"><sup>${mvp.games || 0}</sup> ${isEntreno ? 'partidos' : 'pts'}</div>
+                             </div>
+                             <div style="background: #fdfdfd; padding: 10px; border-radius: 12px;">
+                                 <div style="font-size: 1.5rem;">🥉</div>
+                                 <div style="font-weight: 800; font-size: 0.7rem; color: #333; margin-top: 5px;">${sortedPlayers[2]?.name.split(' ')[0] || '-'}</div>
+                                 <div style="font-size: 0.6rem; color: #888;">${sortedPlayers[2]?.games || 0} ${isEntreno ? 'partidos' : 'pts'}</div>
+                             </div>
+                         </div>
+                    </div>
+
+                    <!-- MVP Card -->
+                    <div style="background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-navy) 100%); border-radius: 28px; padding: 32px; position: relative; overflow: hidden; color: white; border: 1px solid rgba(255,255,255,0.05); box-shadow: var(--shadow-xl);">
+                         <div style="position: absolute; right: -20px; top: -20px; font-size: 8rem; opacity: 0.1; transform: rotate(-15deg);"><i class="fas fa-crown"></i></div>
+                         <div style="display:flex; align-items:center; gap: 24px; position: relative; z-index: 1;">
+                             <div style="width: 80px; height: 80px; background: var(--brand-neon); border-radius: 24px; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; color: black; font-weight: 950; box-shadow: var(--shadow-neon);">1</div>
+                             <div>
+                                <div style="font-size: 0.75rem; font-weight: 900; color: var(--brand-neon); letter-spacing: 2px; text-transform: uppercase;">MVP DEL TORNEO</div>
+                                <div style="font-size: 1.8rem; font-weight: 950; color: white; margin: 4px 0; letter-spacing: -0.5px;">${mvp.name}</div>
+                                <div style="font-size: 0.9rem; color: rgba(255,255,255,0.6); font-weight: 600;">${mvp.games} ${isEntreno ? 'Partidos Ganados' : 'Puntos Totales'}</div>
+                             </div>
+                         </div>
+                    </div>
+
+                    <!-- AUDITORÍA DE RESULTADOS COMPLETA -->
+                    <div style="background: white; border-radius: 20px; padding: 20px; border: 1px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                        <h3 style="margin:0 0 20px 0; font-weight: 950; font-size: 0.85rem; color: #111; letter-spacing: 1px; text-transform: uppercase;">
+                            📋 Auditoría de Resultados Completa
+                        </h3>
+
+                        ${isEntreno ? `
+                        <div style="background: rgba(14,165,233,0.05); padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 0.7rem; color: #0ea5e9; border: 1px solid rgba(14,165,233,0.2);">
+                            <strong>⚖️ REGLAS DE DESEMPATE:</strong><br>
+                            1. Victorias Totales <br>
+                            2. Partidos en Pista 1 <br>
+                            3. Pista más alta alcanzada
+                        </div>
+                        ` : ''}
+                        
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.7rem;">
+                                <thead>
+                                    <tr style="background: #fafafa; border-bottom: 2px solid #eee;">
+                                        <th style="padding: 10px 6px; text-align: left; font-weight: 900; color: #666; font-size: 0.65rem;">POS</th>
+                                        <th style="padding: 10px 6px; text-align: left; font-weight: 900; color: #666; font-size: 0.65rem;">${isEntreno ? (isFija ? 'PAREJA' : 'JUGADOR') : 'JUGADOR'}</th>
+                                        <th style="padding: 10px 6px; text-align: center; font-weight: 900; color: #666; font-size: 0.65rem;">PJ</th>
+                                        <th style="padding: 10px 6px; text-align: center; font-weight: 900; color: #666; font-size: 0.65rem;">VICT.</th>
+                                        <th style="padding: 10px 6px; text-align: center; font-weight: 900; color: #666; font-size: 0.65rem;">DERR.</th>
+                                        <th style="padding: 10px 6px; text-align: center; font-weight: 900; color: #666; font-size: 0.65rem;">${isEntreno ? 'PARTIDOS' : 'JUEGOS'}</th>
+                                        <th style="padding: 10px 6px; text-align: center; font-weight: 900; color: #666; font-size: 0.65rem;">REND. %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${sortedPlayers.map((p, i) => {
+        const winRate = p.matches > 0 ? Math.round((p.wins / p.matches) * 100) : 0;
+        const rowBg = i === 0 ? 'rgba(255,215,0,0.08)' :
+            i === 1 ? 'rgba(192,192,192,0.08)' :
+                i === 2 ? 'rgba(205,127,50,0.08)' : 'white';
+
+        return `
+                                            <tr style="background: ${rowBg}; border-bottom: 1px solid #f5f5f5;">
+                                                <td style="padding: 12px 6px; font-weight: 900; color: #111; font-size: 0.9rem;">
+                                                    ${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                                                </td>
+                                                <td style="padding: 12px 6px; font-weight: 800; color: #111; font-size: 0.75rem;">${p.name}</td>
+                                                <td style="padding: 12px 6px; text-align: center; color: #666; font-weight: 700;">${p.matches}</td>
+                                                <td style="padding: 12px 6px; text-align: center; color: #25D366; font-weight: 800;">${p.wins}</td>
+                                                <td style="padding: 12px 6px; text-align: center; color: #FF2D55; font-weight: 800;">${p.losses}</td>
+                                                <td style="padding: 12px 6px; text-align: center; font-weight: 900; color: #000; font-size: 0.85rem;">${p.games}</td>
+                                                <td style="padding: 12px 6px; text-align: center;">
+                                                    <div style="background: ${winRate >= 70 ? '#25D366' : winRate >= 40 ? '#CCFF00' : '#FF2D55'}; 
+                                                                color: ${winRate >= 40 ? '#000' : '#fff'}; 
+                                                                padding: 4px 8px; 
+                                                                border-radius: 6px; 
+                                                                font-weight: 900; 
+                                                                display: inline-block;
+                                                                font-size: 0.7rem;">
+                                                        ${winRate}%
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `;
+    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- DESTACADOS DEL TORNEO -->
+                    <div style="background: white; border-radius: 20px; padding: 20px; border: 1px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                        <h3 style="margin:0 0 20px 0; font-weight: 950; font-size: 0.85rem; color: #111; letter-spacing: 1px; text-transform: uppercase;">
+                            🏆 Destacados del Torneo
+                        </h3>
+                        
+                        <div style="display: grid; gap: 12px;">
+                            ${invictusPlayers.length > 0 ? `
+                                <div style="background: rgba(37,211,102,0.05); padding: 15px; border-radius: 12px; border-left: 4px solid #25D366;">
+                                    <div style="font-weight: 900; font-size: 0.75rem; color: #25D366; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 1.2rem;">🛡️</span> INVICTUS (100% Victorias)
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #111; font-weight: 700;">
+                                        ${invictusPlayers.map(p => p.name).join(', ')}
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #666; margin-top: 4px;">
+                                        ${invictusPlayers.length === 1 ? 'Rendimiento perfecto' : 'Rendimientos perfectos'}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <div style="background: rgba(204,255,0,0.05); padding: 15px; border-radius: 12px; border-left: 4px solid #CCFF00;">
+                                <div style="font-weight: 900; font-size: 0.75rem; color: #000; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 1.2rem;">🎯</span> FRANCOTIRADOR
+                                </div>
+                                <div style="font-size: 0.8rem; color: #111; font-weight: 700;">
+                                    ${bestSingleMatch.player}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #666; margin-top: 4px;">
+                                    Mejor partido individual: ${bestSingleMatch.score} juegos
+                                </div>
+                            </div>
+                            
+                            <div style="background: rgba(14,165,233,0.05); padding: 15px; border-radius: 12px; border-left: 4px solid #0ea5e9;">
+                                <div style="font-weight: 900; font-size: 0.75rem; color: #0ea5e9; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 1.2rem;">🧱</span> MURO DEFENSIVO
+                                </div>
+                                <div style="font-size: 0.8rem; color: #111; font-weight: 700;">
+                                    ${bestDefense.player}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #666; margin-top: 4px;">
+                                    Mejor defensa: Solo ${bestDefense.pointsAgainst} juegos encajados
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div style="background: white; padding: 15px; border-radius: 16px; text-align: center; border: 1px solid #eee;">
+                            <div style="font-size: 0.65rem; color: #888; font-weight:800;">INTENSIDAD</div>
+                            <div style="font-size: 1.5rem; font-weight: 900; color: #111;">${intensityPercent}%</div>
+                            <div style="font-size: 0.7rem; color: #0055ff;">Partidos Reñidos</div>
+                        </div>
+                        <div style="background: white; padding: 15px; border-radius: 16px; text-align: center; border: 1px solid #eee;">
+                            <div style="font-size: 0.65rem; color: #888; font-weight:800;">TOTAL JUEGOS</div>
+                            <div style="font-size: 1.5rem; font-weight: 900; color: #111;">${totalGames}</div>
+                            <div style="font-size: 0.7rem; color: #009900;">Media: ${(totalGames / Math.max(1, finishedMatches.length)).toFixed(1)}/p</div>
+                        </div>
+                    </div>
+
+                    <!-- CHARTS SECTION -->
+                    <div style="background: white; border-radius: 20px; padding: 20px; border: 1px solid #eee;">
+                        <h3 style="margin:0 0 20px 0; font-weight: 900; font-size: 0.9rem; color: #111;">TOP 5 PLAYERS</h3>
+                        <canvas id="publicTopPlayersChart" style="max-height: 200px; width:100%;"></canvas>
+                    </div>
+
+                    <div style="background: white; border-radius: 20px; padding: 20px; border: 1px solid #eee;">
+                        <h3 style="margin:0 0 20px 0; font-weight: 900; font-size: 0.9rem; color: #111;">RITMO DEL TORNEO (Juegos x Ronda)</h3>
+                        <canvas id="publicRoundEvolutionChart" style="max-height: 200px; width:100%;"></canvas>
+                    </div>
+
+                    <!-- Highlights List -->
+                    <div style="background: white; border-radius: 20px; padding: 0; overflow: hidden; border: 1px solid #eee;">
+                        <div style="padding: 15px; border-bottom: 1px solid #eee; font-weight: 900; font-size: 0.9rem;">Datos Curiosos</div>
+                        
+                        <div style="padding: 15px; border-bottom: 1px solid #f5f5f5; display: flex; align-items:center; gap: 15px;">
+                            <div style="font-size: 1.5rem;">🔥</div>
+                            <div>
+                                <div style="font-weight: 800; font-size: 0.8rem;">PISTA EN LLAMAS</div>
+                                <div style="font-size: 0.75rem; color: #666;">La Pista ${busiestCourtKey} ha visto más juegos (${courtGames[busiestCourtKey]})</div>
+                            </div>
+                        </div>
+
+                        <div style="padding: 15px; display: flex; align-items:center; gap: 15px;">
+                             <div style="font-size: 1.5rem;">🥊</div>
+                            <div>
+                                <div style="font-weight: 800; font-size: 0.8rem;">MAYOR PALIZA</div>
+                                <div style="font-size: 0.75rem; color: #666;">Diferencia de ${bestBlowout.diff} juegos en un solo partido</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+    // Initialize Charts Async
+    setTimeout(() => {
+        const ctx1 = document.getElementById('publicTopPlayersChart')?.getContext('2d');
+        if (ctx1) {
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: top5.map(p => p.name.split(' ')[0]),
+                    datasets: [{
+                        label: 'Puntos',
+                        data: top5.map(p => p.games),
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderRadius: 6
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+
+        const ctx2 = document.getElementById('publicRoundEvolutionChart')?.getContext('2d');
+        if (ctx2) {
+            const rounds = Object.keys(roundStats).sort();
+            new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: rounds.map(r => `R${r}`),
+                    datasets: [{
+                        label: 'Juegos Totales',
+                        data: rounds.map(r => roundStats[r]),
+                        borderColor: '#ccff00',
+                        backgroundColor: 'rgba(204,255,0,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+    }, 200);
+
+    return html;
+}
+
+        renderTournamentCard(match) {
+    try {
+        const isEntreno = this.currentAmericanaDoc?.isEntreno;
+        const colorClass = `border-${(match.court % 4) + 1}`;
+
+        // --- WOW STATUS VISUALS ---
+        const isLive = this.currentAmericanaDoc?.status === 'live' && !match.isFinished;
+        const statusText = match.isFinished ?
+            '<span style="background: #25D366; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 900; font-size: 0.6rem; letter-spacing: 0.5px;">FINALIZADO</span>' :
+            (isLive ? '<span class="status-badge-live">⚡ EN JUEGO</span>' : '<span style="color:#BBB;">ESPERANDO</span>');
+
+        const sA = parseInt(match.score_a || 0);
+        const sB = parseInt(match.score_b || 0);
+
+        // --- 1. Calculate Time ---
+        const timeLabel = (window.calculateMatchTime && typeof window.calculateMatchTime === 'function')
+            ? window.calculateMatchTime(this.currentAmericanaDoc?.time || "10:00", parseInt(match.round) || 1)
+            : "Seguido";
+
+        // --- 2. Styles ---
+        const winnerStyle = "background: rgba(204,255,0,0.1); color: black !important; padding: 6px 10px; border-radius: 8px; font-weight: 950 !important; border-bottom: 3px solid #CCFF00; text-decoration: none;";
+        const normalStyle = "color: #111; font-weight: 800; padding: 6px 0;";
+        const styleA = (match.isFinished && sA > sB) ? winnerStyle : normalStyle;
+        const styleB = (match.isFinished && sB > sA) ? winnerStyle : normalStyle;
+
+        // --- 3. Interaction Logic ---
+        const user = window.Store ? window.Store.getState('currentUser') : null;
+        const isRegisteredInEvent = this.currentAmericanaDoc && user && (
+            (this.currentAmericanaDoc.players || []).some(p => (p.id || p.uid) === user.uid) ||
+            (this.currentAmericanaDoc.registeredPlayers || []).includes(user.uid)
+        );
+
+        const getTeamName = (namesArr, teamStr) => {
+            if (teamStr && typeof teamStr === 'string' && teamStr.length > 0) return teamStr;
+            if (Array.isArray(namesArr)) return namesArr.join(' / ');
+            return String(namesArr || '');
+        };
+
+        const safeTeamA = getTeamName(match.team_a_names, match.teamA) || 'JUGADOR A';
+        const safeTeamB = getTeamName(match.team_b_names, match.teamB) || 'JUGADOR B';
+
+        const isPartA = user && (match.team_a_ids?.includes(user.uid) || safeTeamA.includes(user.name));
+        const isPartB = user && (match.team_b_ids?.includes(user.uid) || safeTeamB.includes(user.name));
+        const isAdmin = ['super_admin', 'superadmin', 'admin', 'admin_player', 'captain'].includes((user?.role || '').toLowerCase());
+
+        // EDIT ALLOWED CHECK
+        // EDIT ALLOWED CHECK (Relaxed for Usability)
+        const canEdit = (this.currentAmericanaDoc?.status === 'live') && (user);
+
+        let actionArea = '';
+
+        if (canEdit) {
+            if (isEntreno) {
+                // === ENTRENO LOGIC (Binary W/L) ===
+                if (match.isFinished) {
+                    actionArea = `
+                                <div style="margin-top: 10px; text-align: center;">
+                                    <button onclick="document.getElementById('edit-actions-${match.id}').style.display='flex'; this.style.display='none'" 
+                                            style="background: transparent; border: 1px solid #ddd; color: #666; padding: 6px 12px; border-radius: 8px; font-size: 0.7rem; cursor: pointer;">
+                                        ✏️ Corregir Resultado
+                                    </button>
+                                    <div id="edit-actions-${match.id}" style="display: none; margin-top: 10px; gap: 10px; justify-content: center;">
+                                        <button onclick="window.ControlTowerView.setMatchWinner('${match.id}', 'A', ${parseInt(match.round)})" class="btn-outline-pro" style="flex: 1; border-color: #25D366; color: #25D366; font-size: 0.75rem; padding: 8px;">GANA P1</button>
+                                        <button onclick="window.ControlTowerView.setMatchWinner('${match.id}', 'B', ${parseInt(match.round)})" class="btn-outline-pro" style="flex: 1; border-color: #25D366; color: #25D366; font-size: 0.75rem; padding: 8px;">GANA P2</button>
+                                    </div>
+                                </div>`;
+                } else {
+                    actionArea = `
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #eee; display: flex; gap: 10px; justify-content: center;">
+                                    <button onclick="window.ControlTowerView.setMatchWinner('${match.id}', 'A', ${parseInt(match.round)})" class="btn-outline-pro" style="flex: 1; border-color: #25D366; color: #25D366; font-size: 0.75rem; padding: 8px; background: ${isPartA ? 'rgba(37, 211, 102, 0.1)' : 'white'};">GANA P1</button>
+                                    <button onclick="window.ControlTowerView.setMatchWinner('${match.id}', 'B', ${parseInt(match.round)})" class="btn-outline-pro" style="flex: 1; border-color: #25D366; color: #25D366; font-size: 0.75rem; padding: 8px; background: ${isPartB ? 'rgba(37, 211, 102, 0.1)' : 'white'};">GANA P2</button>
+                                </div>`;
+                }
+            } else {
+                // === AMERICANA LOGIC (Numeric Steppers) ===
+                const stepperUI = `
+                            <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:#f9f9f9; padding:10px; border-radius:12px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <button onclick="window.ControlTowerView.adjustScore('${match.id}', 'score_a', -1)" style="width:30px; height:30px; border-radius:50%; border:1px solid #ddd; background:white; font-weight:900;">-</button>
+                                        <span id="score-a-val-${match.id}" style="font-size:1.2rem; font-weight:900; width:30px; text-align:center;">${sA}</span>
+                                        <button onclick="window.ControlTowerView.adjustScore('${match.id}', 'score_a', 1)" style="width:30px; height:30px; border-radius:50%; border:1px solid #ddd; background:#fff; color:#25D366; font-weight:900;">+</button>
+                                    </div>
+                                    <div style="font-weight:900; color:#ddd; font-size:1.2rem;">-</div>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <button onclick="window.ControlTowerView.adjustScore('${match.id}', 'score_b', -1)" style="width:30px; height:30px; border-radius:50%; border:1px solid #ddd; background:white; font-weight:900;">-</button>
+                                        <span id="score-b-val-${match.id}" style="font-size:1.2rem; font-weight:900; width:30px; text-align:center;">${sB}</span>
+                                        <button onclick="window.ControlTowerView.adjustScore('${match.id}', 'score_b', 1)" style="width:30px; height:30px; border-radius:50%; border:1px solid #ddd; background:#fff; color:#25D366; font-weight:900;">+</button>
+                                    </div>
+                                </div>
+                                <button onclick="window.ControlTowerView.finishMatch('${match.id}')" style="width:100%; padding:12px; background: #CCFF00; color:black; font-weight:900; border:none; border-radius:10px; box-shadow: 0 4px 10px rgba(204,255,0,0.3);">
+                                    ✅ CONFIRMAR RESULTADO
+                                </button>
+                            </div>
+                        `;
+
+                if (match.isFinished) {
+                    actionArea = `
+                                <div style="margin-top: 10px; text-align: center;">
+                                    <div style="font-size:0.8rem; color:#888; margin-bottom:5px;">Resultado confirmado</div>
+                                    <button onclick="document.getElementById('edit-actions-${match.id}').style.display='flex'; this.style.display='none'" 
+                                            style="background: transparent; border: 1px solid #ddd; color: #666; padding: 6px 12px; border-radius: 8px; font-size: 0.7rem; cursor: pointer;">
+                                        ✏️ CORREGIR / EDITAR
+                                    </button>
+                                    <div id="edit-actions-${match.id}" style="display: none; margin-top: 10px;">
+                                        ${stepperUI}
+                                    </div>
+                                </div>
+                            `;
+                } else {
+                    actionArea = `<div style="margin-top:15px; padding-top:15px; border-top:1px dashed #eee;">${stepperUI}</div>`;
+                }
+            }
+        }
+
+        return `
+                    <div id="tour-match-${match.id}" class="tour-match-card ${colorClass}" style="
+                        background: var(--bg-card); 
+                        border-radius: 28px; 
+                        border: 1px solid var(--border-subtle); 
+                        overflow: hidden; 
+                        box-shadow: var(--shadow-md);
+                        transition: all 0.3s ease;
+                    ">
+                        <div style="padding: 14px 20px; background: var(--brand-navy); display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.65rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1.5px; text-transform: uppercase;">
+                                <i class="fas fa-th-large" style="color: var(--brand-neon); margin-right: 6px;"></i> PISTA ${match.court} • ${timeLabel}
+                            </span>
+                            <div class="status-area">${statusText}</div>
+                        </div>
+                        
+                        <div style="padding: 24px;">
+                            <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 15px; margin-bottom: 15px;">
+                                <div id="match-name-a-${match.id}" style="font-size: 1rem; color: var(--text-primary); transition: all 0.3s; ${styleA}">${safeTeamA}</div>
+                                <div id="match-score-a-${match.id}" style="
+                                    background: ${match.isFinished && sA > sB ? 'var(--brand-neon)' : 'var(--bg-app)'}; 
+                                    color: ${match.isFinished && sA > sB ? 'black' : 'var(--text-primary)'}; 
+                                    width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; 
+                                    font-weight: 950; font-size: 1.3rem; 
+                                    box-shadow: ${match.isFinished && sA > sB ? 'var(--shadow-neon)' : 'inset 0 2px 4px rgba(0,0,0,0.05)'};
+                                ">${sA}</div>
+                            </div>
+                            
+                            <div style="height: 1px; background: var(--border-subtle); margin-bottom: 15px; position: relative;">
+                                <div style="position: absolute; left: 0; top: -1px; width: 40px; height: 3px; background: var(--brand-neon); border-radius: 10px;"></div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 15px;">
+                                <div id="match-name-b-${match.id}" style="font-size: 1rem; color: var(--text-primary); transition: all 0.3s; ${styleB}">${safeTeamB}</div>
+                                <div id="match-score-b-${match.id}" style="
+                                    background: ${match.isFinished && sB > sA ? 'var(--brand-neon)' : 'var(--bg-app)'}; 
+                                    color: ${match.isFinished && sB > sA ? 'black' : 'var(--text-primary)'}; 
+                                    width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; 
+                                    font-weight: 950; font-size: 1.3rem; 
+                                    box-shadow: ${match.isFinished && sB > sA ? 'var(--shadow-neon)' : 'inset 0 2px 4px rgba(0,0,0,0.05)'};
+                                ">${sB}</div>
+                            </div>
+                            
+                            ${actionArea}
+                        </div>
+                    </div>
+                `;
+    } catch (err) {
+        console.error("Match Render Error:", err, match);
+        return `<div style="padding:20px; color:red; font-size:0.7rem;">Error al cargar tarjeta de partido: ${err.message}</div>`;
+    }
+}
+
+        async adjustScore(matchId, field, delta) {
+    const isEntreno = this.currentAmericanaDoc?.isEntreno;
+    const collection = isEntreno ? 'entrenos_matches' : 'matches';
+    // Optimistic update supported by auto-re-render from onSnapshot listener
+    const match = this.allMatches.find(m => m.id === matchId);
+    if (!match) return;
+
+    let currentVal = parseInt(match[field] || 0);
+    let newVal = currentVal + delta;
+    if (newVal < 0) newVal = 0;
+
+    try {
+        // Update specific field
+        await window.db.collection(collection).doc(matchId).update({
+            [field]: newVal,
+            // Note: We don't finish match here, just track score
+        });
+    } catch (e) {
+        console.error("Score update failed:", e);
+    }
+}
+
+        async finishMatch(matchId) {
+    const isEntreno = this.currentAmericanaDoc?.isEntreno;
+    const collection = isEntreno ? 'entrenos_matches' : 'matches';
+    try {
+        await window.db.collection(collection).doc(matchId).update({
+            status: 'finished'
+        });
+        console.log("Match finished:", matchId);
+    } catch (e) {
+        console.error("Finish match failed:", e);
+    }
+}
+
+        // KEEP LEGACY METHOD FOR ENTRENOS
+        async setMatchWinner(matchId, winnerTeam, round) {
+    const confirmMsg = "Confirmar resultado:\n\n" + (winnerTeam === 'A' ? "Gana Pareja 1" : "Gana Pareja 2");
+    if (!confirm(confirmMsg)) return;
+
+    const isEntreno = this.currentAmericanaDoc?.isEntreno;
+    const collection = isEntreno ? 'entrenos_matches' : 'matches';
+
+    try {
+        await window.db.collection(collection).doc(matchId).update({
+            score_a: winnerTeam === 'A' ? 1 : 0,
+            score_b: winnerTeam === 'B' ? 1 : 0,
+            status: 'finished'
+        });
+        console.log(`✅ Match Result Saved.`);
+    } catch (e) {
+        console.error("Error setting match winner:", e);
+        alert("Error al guardar resultado.");
+    }
+}
+
+        async triggerNextRound(round) {
+    const isEntreno = this.currentAmericanaDoc?.isEntreno;
+    const eventType = isEntreno ? 'entreno' : 'americana';
+    const nextRound = round + 1;
+
+    // CHECK IF NEXT ROUND ALREADY EXISTS
+    // matchesCollection is 'matches' (unified) or 'entrenos_matches' (if legacy fallback used, but we use unified now)
+    // But AmericanaService handles collection names. We just need to check if we should Warn.
+
+    // We can check local matches since we have real-time sync
+    const nextRoundExists = this.allMatches.some(m => parseInt(m.round) === nextRound);
+
+    let msg = "¿CONFIRMAR CAMBIO DE RONDA?\n\nAsegúrate de que todos los resultados sean correctos.";
+    if (nextRoundExists) {
+        msg = `⚠️ ATENCIÓN: LA RONDA ${nextRound} YA EXISTE\n\nAl confirmar, SE BORRARÁ la Ronda ${nextRound} actual y se regenerará con los nuevos resultados.\n\n¿Estás seguro de que deseas regenerar cruces?`;
+    }
+
+    if (!confirm(msg)) return;
+
+    document.getElementById('next-round-btn-container').innerHTML = '<div class="loader"></div>';
+
+    try {
+        if (nextRoundExists) {
+            console.log(`♻️ Regenerating Round ${nextRound}... deleting old matches.`);
+            await window.AmericanaService.deleteRound(this.currentAmericanaDoc.id, nextRound, eventType);
+        }
+
+        if (window.AmericanaService && window.AmericanaService.generateNextRound) {
+            await window.AmericanaService.generateNextRound(this.currentAmericanaDoc.id, round, eventType);
+        } else if (window.AmericanaService && window.AmericanaService.generateEntrenoNextRound && isEntreno) {
+            // Fallback
+            await window.AmericanaService.generateEntrenoNextRound(this.currentAmericanaDoc.id, round);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error al generar ronda: " + e.message);
+        // Reload to show button again
+        this.recalc();
+    }
+}
+
+renderHistoryContent() {
+    const s = this.userStats;
+    const winRate = s.games > 0 ? Math.round((s.wins / (this.userMatches.length || 1)) * 100) : 0;
+
+    return `
+                <div class="fade-in" style="padding: 24px; min-height: 80vh; background: #f8fafc; padding-bottom: 120px;">
+                    
+                    <!-- PREMIUM STATS HEADER -->
+                    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 28px; padding: 30px; margin-bottom: 30px; color: white; box-shadow: 0 15px 35px rgba(0,0,0,0.2); position: relative; overflow: hidden;">
+                        <div style="position: absolute; right: -20px; top: -20px; font-size: 8rem; opacity: 0.05; transform: rotate(-15deg);"><i class="fas fa-history"></i></div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; position: relative; z-index: 1;">
+                            <div style="text-align: center; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                                <div style="color: #CCFF00; font-size: 2rem; font-weight: 950; line-height: 1;">${s.events}</div>
+                                <div style="font-size: 0.65rem; font-weight: 850; letter-spacing: 1.5px; opacity: 0.6; margin-top: 8px; text-transform: uppercase;">Eventos</div>
+                            </div>
+                            <div style="text-align: center; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                                <div style="color: white; font-size: 2rem; font-weight: 950; line-height: 1;">${s.games}</div>
+                                <div style="font-size: 0.65rem; font-weight: 850; letter-spacing: 1.5px; opacity: 0.6; margin-top: 8px; text-transform: uppercase;">Juegos</div>
+                            </div>
+                            <div style="text-align: center; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                                <div style="color: #60a5fa; font-size: 2.2rem; font-weight: 950; line-height: 1;">${s.wins}</div>
+                                <div style="font-size: 0.65rem; font-weight: 850; letter-spacing: 1.5px; opacity: 0.6; margin-top: 8px; text-transform: uppercase;">Victorias</div>
+                            </div>
+                            <div style="text-align: center; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                                <div style="color: #10b981; font-size: 2.2rem; font-weight: 950; line-height: 1;">${winRate}<span style="font-size: 1rem; opacity: 0.6;">%</span></div>
+                                <div style="font-size: 0.65rem; font-weight: 850; letter-spacing: 1.5px; opacity: 0.6; margin-top: 8px; text-transform: uppercase;">Eficacia</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 style="font-family:'Outfit'; font-weight: 950; color: #0f172a; margin: 0 0 20px 5px; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-list-ul" style="color: #CCFF00; font-size: 1rem;"></i> CRONOLOGÍA HISTÓRICA
+                    </h3>
+
+                    <div style="display: grid; gap: 15px;">
+                        ${this.userHistory.length === 0 ? `
+                            <div style="background: white; border-radius: 24px; padding: 60px 40px; text-align: center; border: 1px dashed #cbd5e1; color: #94a3b8;">
+                                <i class="fas fa-ghost" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.3;"></i>
+                                <p style="font-weight: 800; font-size: 1rem;">No tienes historial registrado</p>
+                                <p style="font-size: 0.8rem; opacity: 0.7;">Tus Americanas aparecerán aquí al finalizar.</p>
+                            </div>
+                        ` :
+            this.userHistory.map(h => {
+                const amDate = h.date ? new Date(h.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Fecha desconocida';
+                return `
+                            <div class="history-item-card" 
+                                 onclick="window.ControlTowerView.load('${h.id}'); window.ControlTowerView.switchSection('playing');"
+                                 style="
+                                    background: white; 
+                                    padding: 20px; 
+                                    border: 1px solid #e2e8f0; 
+                                    border-radius: 24px; 
+                                    box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    cursor: pointer;
+                                    transition: all 0.2s;
+                                 "
+                                 onmouseover="this.style.transform='translateX(5px)'; this.style.borderColor='#CCFF00';"
+                                 onmouseout="this.style.transform='none'; this.style.borderColor='#e2e8f0';"
+                            >
+                                <div>
+                                    <div style="font-weight: 950; font-size: 1rem; color: #0f172a; margin-bottom: 3px;">${h.name.toUpperCase()}</div>
+                                    <div style="display: flex; align-items: center; gap: 10px; font-size: 0.7rem; color: #64748b; font-weight: 700;">
+                                        <span><i class="far fa-calendar-alt"></i> ${amDate}</span>
+                                        <span style="opacity: 0.3;">|</span>
+                                        <span style="color: #CCFF00; background: #000; padding: 1px 6px; border-radius: 4px; font-size: 0.6rem;">${(h.category || 'PRO').toUpperCase()}</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="text-align: right; margin-right: 10px;">
+                                        <div style="font-size: 0.5rem; color: #94a3b8; font-weight: 900; text-transform: uppercase;">Ver stats</div>
+                                        <i class="fas fa-chevron-right" style="color: #CCFF00; font-size: 0.8rem;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        `}).join('')}
+                    </div>
+                </div>
+            `;
+}
+
+renderHelpContent() {
+    return `
+                <div class="fade-in" style="padding: 30px; min-height: 80vh; background: white; padding-bottom: 100px;">
+                    <h2 style="font-family:'Outfit'; font-weight: 900; color: #111; margin-bottom: 30px;">Centro de Ayuda</h2>
+                    <div style="display: grid; gap: 20px;">
+                        
+                        <!-- 1. RANKING -->
+                        <div style="background: #f9f9f9; padding: 25px; border-radius: 20px; border: 1px solid #eee;">
+                            <div style="font-weight: 900; margin-bottom: 12px; color: #0055ff; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-trophy"></i> Reglas del Ranking
+                            </div>
+                            <p style="font-size: 0.85rem; color: #555; line-height: 1.6; margin: 0;">
+                                En SomosPadel, cada juego cuenta. A diferencia de otros sistemas, aquí sumas <b>1 punto por cada juego ganado</b> en tus partidos. 
+                                <br><br>
+                                Al finalizar las 6 rondas de la Americana, el sistema suma todos tus juegos. El jugador con la puntuación más alta es nombrado <b>MVP</b>. Este sistema premia la regularidad y el esfuerzo en cada bola.
+                            </p>
+                        </div>
+
+                        <!-- 2. NIVELES -->
+                        <div style="background: #f9f9f9; padding: 25px; border-radius: 20px; border: 1px solid #eee;">
+                            <div style="font-weight: 900; margin-bottom: 12px; color: #0055ff; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-chart-line"></i> Niveles Dinámicos y Evolución
+                            </div>
+                            <p style="font-size: 0.85rem; color: #555; line-height: 1.6; margin: 0;">
+                                Tu nivel es el reflejo de tu juego constante. En SomosPadel, hemos implementado un sistema de **progresión por décimas**: 
+                                <br><br>
+                                • cada vez que <b>ganas un partido</b>, tu nivel subirá unas décimas automáticamente. 
+                                <br>• Si el partido es muy reñido o contra rivales de nivel superior, la recompensa es mayor. 
+                                <br>• Incluso en la derrota, si luchas cada punto, tu nivel se ajustará para reflejar tu competitividad real.
+                                <br><br>
+                                Esta es tu motivación extra: cada partido cuenta para subir de categoría y desbloquear Americanas de nivel superior.
+                            </p>
+                        </div>
+
+                        <!-- 3. APP USAGE -->
+                        <div style="background: #f9f9f9; padding: 25px; border-radius: 20px; border: 1px solid #eee;">
+                            <div style="font-weight: 900; margin-bottom: 12px; color: #0055ff; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-mobile-alt"></i> Cómo usar la App
+                            </div>
+                            <p style="font-size: 0.85rem; color: #555; line-height: 1.6; margin: 0;">
+                                • <b>En Juego:</b> Consulta tus pistas y compañeros en tiempo real desde la pestaña principal.
+                                <br>• <b>Resultados:</b> Los administradores suben los marcadores y el ranking se actualiza instantáneamente.
+                                <br>• <b>Mi Pasado:</b> Revisa tu historial de Americanas y analiza tu evolución a lo largo del tiempo.
+                                <br>• <b>Check-in:</b> No olvides confirmar tu asistencia para que el sorteo de pistas sea equitativo.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+}
+
+window.ControlTowerView = new ControlTowerView();
+console.log("🗼 ControlTowerView (Pro) v4005 Initialized");
+}) ();

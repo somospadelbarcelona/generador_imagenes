@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SomosPadel BCN - App Portfolio</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;800;900&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #CCFF00;
+            --dark: #0f172a;
+            --darker: #020617;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--darker);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* HERO SECTION */
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: radial-gradient(circle at center, #1a2c4e 0%, var(--darker) 70%);
+            position: relative;
+        }
+
+        .hero h1 {
+            font-size: 5rem;
+            font-weight: 900;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .hero p {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            max-width: 600px;
+            margin: 0 auto 40px auto;
+        }
+
+        .btn-scroll {
+            background: var(--primary);
+            color: black;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-weight: 800;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        .btn-scroll:hover {
+            transform: scale(1.05);
+        }
+
+        /* MOCKUP GRIDS */
+        .section {
+            padding: 100px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .text-content h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .text-content p {
+            font-size: 1.1rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .feature-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(204, 255, 0, 0.1);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 1.2rem;
+        }
+
+        /* PHONE MOCKUP CONTAINER */
+        .mockup-container {
+            position: relative;
+            height: 600px;
+            background: radial-gradient(circle at center, rgba(204, 255, 0, 0.05), transparent 60%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .phone-frame {
+            width: 300px;
+            height: 600px;
+            background: #000;
+            border-radius: 40px;
+            border: 8px solid #333;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: #1e1e1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 0.8rem;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .mock-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* HIGHLIGHT TEXT */
+        .highlight {
+            color: var(--primary);
+        }
+
+        /* RESPONSIVE DESIGN (TABLET & MOBILE) */
+        @media (max-width: 900px) {
+            .hero h1 {
+                font-size: 3rem;
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr;
+                gap: 40px;
+                text-align: center;
+            }
+
+            .feature-card {
+                text-align: left;
+            }
+
+            /* Reorder text above image on mobile for better flow */
+            .section:nth-child(odd) .mockup-container {
+                order: 2;
+            }
+
+            .section:nth-child(odd) .text-content {
+                order: 1;
+            }
+
+            .phone-frame {
+                width: 260px;
+                height: 520px;
+                border-width: 6px;
+            }
+
+            .mockup-container {
+                height: auto;
+                padding: 40px 0;
+            }
+
+            nav {
+                padding: 15px 20px;
+                position: relative;
+                background: var(--darker);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <nav
+        style="padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; position: absolute; width: 100%; top: 0; box-sizing: border-box; z-index: 10;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="img/logo_somospadel.png" alt="Logo SomosPadel" style="height: 40px;">
+            <span style="font-family: 'Outfit'; font-weight: 800; font-size: 1.2rem; color: white;">SOMOSPADEL
+                BCN</span>
+        </div>
+        <div>
+            <span style="opacity: 0.5; font-size: 0.9rem;">v2.1 Stable</span>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="container">
+            <div
+                style="font-size: 1rem; font-weight: 800; color: var(--primary); letter-spacing: 2px; margin-bottom: 20px;">
+                PORTFOLIO DIGITAL</div>
+            <h1>El Futuro del Pádel<br>es Conectado</h1>
+            <p>Una plataforma integral para gestionar entrenos, americanas y torneos , una comunidad de más de 300
+                jugadores. Olvida el caos de WhatsApp.</p>
+            <a href="#features" class="btn-scroll">Ver Tour</a>
+        </div>
+    </section>
+
+    <!-- 1. AGENDA -->
+    <section id="features" class="section">
+        <div class="container grid-2">
+            <div class="mockup-container">
+                <div class="phone-frame">
+                    <img src="img/portfolio_agenda.png" class="mock-img" alt="Agenda Screen">
+                </div>
+            </div>
+            <div class="text-content">
+                <h2>Tu Agenda,<br><span class="highlight">Sin Fricción</span></h2>
+                <p>La experiencia de reserva reinventada. Los jugadores ven los eventos disponibles, su estado en tiempo
+                    real y pueden inscribirse con un solo toque.</p>
+
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-magic"></i></div>
+                    <div><b>Inscripción en 1 Clic</b><br><small style="color:#888">Sin formularios eternos.</small>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-bell"></i></div>
+                    <div><b>Batseñal Automática</b><br><small style="color:#888">Si hay hueco, la app te avisa.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. ALGORITMO -->
+    <section class="section">
+        <div class="container grid-2">
+            <div class="text-content">
+                <h2>Matchmaking<br><span class="highlight">Inteligente</span></h2>
+                <p>Nuestro algoritmo propietario analiza el nivel de cada jugador, sus resultados históricos y su equipo
+                    para crear partidos 100% equilibrados.</p>
+
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-brain"></i></div>
+                    <div><b>Cerebro de Competición</b><br><small style="color:#888">Genera cruces perfectos al
+                            instante.</small></div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-users"></i></div>
+                    <div><b>Prioridad de Equipo</b><br><small style="color:#888">Mantiene unidos a los
+                            compañeros.</small></div>
+                </div>
+            </div>
+            <div class="mockup-container">
+                <div class="phone-frame">
+                    <img src="img/portfolio_results.png" class="mock-img" alt="Results Screen">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. GAMIFICACIÓN (SEMÁFORO) -->
+    <section class="section">
+        <div class="container grid-2">
+            <div class="mockup-container">
+                <div class="phone-frame">
+                    <img src="img/portfolio_profile.png" class="mock-img" alt="Profile Screen">
+                </div>
+            </div>
+            <div class="text-content">
+                <h2>Gamificación<br><span class="highlight">En Tiempo Real</span></h2>
+                <p>Hemos introducido el concepto de <b>Fiabilidad del Jugador</b>. Un sistema visual que motiva a la
+                    comunidad a mantenerse activa.</p>
+
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-check-circle" style="color:#00ff64;"></i></div>
+                    <div><b>Estado Activo (Verde)</b><br><small style="color:#888">Nivel confirmado.</small></div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-exclamation-triangle" style="color:#FF5555;"></i></div>
+                    <div><b>Estado Oxidado (Rojo)</b><br><small style="color:#888">Si no juegas, pierdes nivel.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. RESUMEN ECOSISTEMA -->
+    <section class="section"
+        style="background: linear-gradient(to bottom, transparent, rgba(204, 255, 0, 0.05)); border-bottom: none;">
+        <div class="container" style="text-align: center; max-width: 900px;">
+            <div
+                style="font-size: 0.9rem; font-weight: 800; color: #fff; opacity: 0.6; letter-spacing: 2px; margin-bottom: 20px;">
+                TODO EN UNO</div>
+            <h2 style="font-size: 2.5rem; margin-bottom: 30px;">Un Ecosistema <span class="highlight">Completo</span>
+            </h2>
+
+            <p style="font-size: 1.2rem; color: #cbd5e1; line-height: 1.8; margin-bottom: 60px;">
+                Más que una app, es el motor digital de Somospadel. Desde la <b>gestión automática de reservas</b> y
+                listas de espera inteligentes, hasta un sistema de <b>matchmaking algorítmico</b> que equilibra partidos
+                al milímetro. Sumado a perfiles gamificados con <b>'Semáforo de Fiabilidad'</b>, ajuste dinámico de
+                nivel post-partido y notificaciones contextuales. Todo lo que necesitas para competir, mejorar y
+                divertirte, centralizado en una experiencia premium.
+            </p>
+
+            <!-- MICRO FEATURES GRID -->
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: left;">
+                <div class="feature-card" style="flex-direction: column; align-items: flex-start;">
+                    <i class="fas fa-chart-line highlight" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
+                    <div style="font-weight: 700; color: white;">Nivel Dinámico</div>
+                    <div style="font-size: 0.8rem; color: #888;">Sube o baja automáticamente según tus resultados.</div>
+                </div>
+                <div class="feature-card" style="flex-direction: column; align-items: flex-start;">
+                    <i class="fas fa-robot highlight" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
+                    <div style="font-weight: 700; color: white;">Smart Rescues</div>
+                    <div style="font-size: 0.8rem; color: #888;">Detecta jugadores inactivos (Semáforo Rojo/Amarillo).
+                    </div>
+                </div>
+                <div class="feature-card" style="flex-direction: column; align-items: flex-start;">
+                    <i class="fas fa-stopwatch highlight" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
+                    <div style="font-weight: 700; color: white;">Live Score</div>
+                    <div style="font-size: 0.8rem; color: #888;">Resultados en tiempo real durante el torneo.</div>
+                </div>
+                <div class="feature-card" style="flex-direction: column; align-items: flex-start;">
+                    <i class="fab fa-whatsapp highlight" style="font-size: 1.5rem; margin-bottom: 10px;"></i>
+                    <div style="font-weight: 700; color: white;">Alertas Directas</div>
+                    <div style="font-size: 0.8rem; color: #888;">Batseñal para cubrir bajas de última hora.</div>
+                </div>
+            </div>
+
+            <!-- COMMUNITY ACCESS BANNER -->
+            <div
+                style="margin-top: 50px; padding: 30px; background: rgba(255, 255, 255, 0.03); border-radius: 20px; border: 1px dashed rgba(255,255,255,0.1); display: inline-block;">
+                <h3 style="color: var(--primary); font-size: 1.2rem; margin-bottom: 10px;"><i class="fas fa-users"></i>
+                    DISPONIBLE PARA LA COMUNIDAD</h3>
+                <p style="color: #ccc; margin: 0; font-size: 1rem;">
+                    Esta plataforma está abierta y operativa para <b>todos los jugadores de SomosPadel BCN</b>. <br>
+                    Cada miembro tiene su propio acceso personal para inscribirse, ver su evolución y formar parte
+                    activa de la competición.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer style="text-align:center; padding: 50px; color:#666; border-top: 1px solid var(--border);">
+        <p style="font-size: 0.9rem;">SomosPadel BCN © 2026. Powered by <span style="color:white; font-weight:700;">Alex
+                Coscolin - Somospadel EU</span></p>
+    </footer>
+
+</body>
+
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="js/security-core.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIVE - Somos Padel Barcelona</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #000;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .live-header {
+            padding: 2rem;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .live-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            padding: 2rem;
+            overflow: hidden;
+        }
+
+        .leaderboard-container {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 24px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .live-matches-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .rank-card {
+            display: grid;
+            grid-template-columns: 60px 1fr 100px;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            margin-bottom: 0.8rem;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .rank-number {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .player-info {
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .player-pts {
+            text-align: right;
+            font-family: 'Outfit';
+            font-weight: 900;
+            font-size: 1.4rem;
+            color: var(--primary);
+        }
+
+        .live-match-mini {
+            background: var(--grad-dark);
+            border: 1px solid var(--primary-glow);
+            border-radius: 16px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .live-match-mini .court {
+            font-size: 0.6rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .live-match-mini .vs {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="live-header">
+        <div style="display:flex; align-items:center; gap: 20px;">
+            <img src="img/logo_somospadel.png" style="height: 60px;" alt="Logo">
+            <div>
+                <h1 style="font-size: 2rem; margin:0;">LIVE BROADCAST</h1>
+                <p style="color: var(--primary); font-weight: 800; letter-spacing: 2px; font-size: 0.8rem;">SOMOS PADEL
+                    BARCELONA</p>
+            </div>
+        </div>
+        <div id="round-info" style="text-align: right;">
+            <div style="font-size: 2.5rem; font-weight: 900; color: var(--primary);">RONDA 3</div>
+            <div style="font-size: 1rem; color: var(--text-muted); font-weight: 700;">TIEMPO RESTANTE: 14:20</div>
+        </div>
+    </header>
+
+    <main class="live-grid">
+        <div class="leaderboard-container">
+            <h3 style="color: var(--text-muted); margin-bottom: 1.5rem; letter-spacing: 2px;">TOP 15 LEADERS</h3>
+            <div id="leaderboard-list">
+                <!-- Data via JS -->
+            </div>
+        </div>
+
+        <div class="live-matches-column">
+            <h3 style="color: var(--text-muted); margin-bottom: 0.5rem; letter-spacing: 2px;">PARTIDOS EN PISTA</h3>
+            <div id="live-matches-list" style="display:flex; flex-direction:column; gap: 1rem;">
+                <!-- Data via JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/firebase-init.js"></script>
+
+    <script>
+        async function updateLiveDashboard() {
+            try {
+                const players = await FirebaseDB.players.getAll();
+                const americanas = await FirebaseDB.americanas.getAll();
+                const activeAmericana = americanas.find(a => a.status === 'open') || americanas[0];
+
+                if (!activeAmericana) return;
+
+                const matches = await FirebaseDB.matches.getByAmericana(activeAmericana.id);
+
+                // Update Leaderboard
+                const sortedPlayers = players.sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 15);
+                const lbList = document.getElementById('leaderboard-list');
+                lbList.innerHTML = sortedPlayers.map((p, i) => `
+                    <div class="rank-card">
+                        <div class="rank-number">#${i + 1}</div>
+                        <div class="player-info">${p.name.toUpperCase()}</div>
+                        <div class="player-pts">${p.score || 0} <span style="font-size: 0.6rem; color: var(--text-muted)">PTS</span></div>
+                    </div>
+                `).join('');
+
+                // Update Matches
+                const liveMatches = matches.filter(m => m.status === 'live');
+                const mList = document.getElementById('live-matches-list');
+                mList.innerHTML = liveMatches.map(m => `
+                    <div class="live-match-mini">
+                        <div class="court">PISTA ${m.court}</div>
+                        <div class="vs">
+                            <span>${m.team_a_names}</span>
+                            <span style="color: var(--primary)">VS</span>
+                            <span>${m.team_b_names}</span>
+                        </div>
+                    </div>
+                `).join('') || '<p style="color:var(--text-muted); text-align:center;">Esperando inicio de partidos...</p>';
+
+                // Update Round
+                const currentRound = Math.max(...matches.map(m => m.round || 1), 1);
+                document.querySelector('#round-info div:first-child').textContent = `RONDA ${currentRound}`;
+
+            } catch (e) { console.error(e); }
+        }
+
+        setInterval(updateLiveDashboard, 5000);
+        updateLiveDashboard();
+    </script>
+</body>
+
+</html>

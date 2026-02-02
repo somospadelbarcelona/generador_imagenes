@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <script src="js/security-core.js"></script>
+    <script src="js/core/SecurityArmor.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - App Somospadel BCN</title>
+    <link rel="stylesheet" href="css/style.css?v=1002">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-bottom-color: var(--primary, #ccff00);
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 1.5rem;
+            color: #888;
+            padding: 3rem;
+        }
+
+        /* --- 💎 FORCE WHITE TEXT IN ADMIN INTERFACE --- */
+        :root {
+            --text: #ffffff !important;
+            --text-muted: #bbbbbb !important;
+            --admin-sticky-top: 20px;
+            color-scheme: dark;
+            /* Indica al navegador que la página es oscura */
+        }
+
+        /* Fuerza a que TODO lo que no sea una excepción sea blanco */
+        html,
+        body,
+        div,
+        span,
+        applet,
+        object,
+        iframe,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p,
+        blockquote,
+        pre,
+        a,
+        abbr,
+        acronym,
+        address,
+        big,
+        cite,
+        code,
+        del,
+        dfn,
+        em,
+        img,
+        ins,
+        kbd,
+        q,
+        s,
+        samp,
+        small,
+        strike,
+        strong,
+        sub,
+        sup,
+        tt,
+        var,
+        b,
+        u,
+        i,
+        center,
+        dl,
+        dt,
+        dd,
+        ol,
+        ul,
+        li,
+        fieldset,
+        form,
+        label,
+        legend,
+        table,
+        caption,
+        tbody,
+        tfoot,
+        thead,
+        tr,
+        th,
+        td,
+        article,
+        aside,
+        canvas,
+        details,
+        embed,
+        figure,
+        figcaption,
+        footer,
+        header,
+        hgroup,
+        menu,
+        nav,
+        output,
+        ruby,
+        section,
+        summary,
+        time,
+        mark,
+        audio,
+        video,
+        input,
+        select,
+        textarea {
+            color: #ffffff !important;
+        }
+
+        /* Allow icons to have their own colors */
+        i.fas,
+        i.fab,
+        i.far {
+            color: inherit !important;
+        }
+
+        /* Labels priority fix */
+        .pro-form label,
+        .pro-form .form-group label,
+        .modal-content label,
+        .modal-content .form-group label,
+        .compact-admin-form label {
+            color: #ffffff !important;
+            opacity: 1 !important;
+            font-weight: 800 !important;
+            font-size: 0.75rem !important;
+            margin-bottom: 6px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        /* Inputs & Selects priority fix */
+        .pro-input,
+        select.pro-input,
+        .pro-input-micro,
+        select.pro-input-micro,
+        .modal-content input,
+        .modal-content select,
+        .modal-content textarea,
+        #create-entreno-form input,
+        #create-entreno-form select {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.07) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            height: 42px !important;
+            padding: 8px 15px !important;
+            font-size: 0.95rem !important;
+            border-radius: 10px !important;
+            width: 100% !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        /* Force Select Icon White */
+        select.pro-input {
+            appearance: none !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 12px center !important;
+            background-size: 18px !important;
+            padding-right: 40px !important;
+        }
+
+        /* Dropdown options fix (Keep legible: Black on White) */
+        .pro-input option,
+        select.pro-input option,
+        .modal-content select option {
+            color: #000000 !important;
+            background: #ffffff !important;
+            font-weight: 600 !important;
+        }
+
+        /* Placeholder */
+        .pro-input::placeholder,
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.4) !important;
+        }
+
+        /* Headings & Text */
+        .modal-content h1,
+        .modal-content h2,
+        .modal-content h3,
+        .top-title,
+        #page-title,
+        .glass-card-enterprise h3 {
+            color: #ffffff !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+        }
+
+        /* Button Exception (Maintain original contrast) */
+        .btn-primary-pro,
+        .btn-glow,
+        .btn-primary-pro *,
+        .btn-glow * {
+            color: #000000 !important;
+        }
+
+        /* --- 🚀 MASSIVE WHITE TEXT REINFORCEMENT --- */
+        /* Targets almost everything inside content areas to avoid black text issues */
+        .modal-content div,
+        .modal-content span,
+        .modal-content p,
+        .modal-content td,
+        .modal-content th,
+        .modal-content strong,
+        .workspace-area div,
+        .workspace-area span,
+        .workspace-area p,
+        .workspace-area td,
+        .workspace-area th,
+        .glass-card-enterprise div,
+        .glass-card-enterprise span,
+        .player-row,
+        .player-row *,
+        input,
+        select,
+        textarea,
+        .pro-input,
+        .pro-input * {
+            color: #ffffff !important;
+        }
+
+        /* Special fix for placeholders to be visible but muted */
+        input::placeholder,
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+
+        /* Keep select options black for readability in the dropdown */
+        option {
+            color: #000000 !important;
+            background: #ffffff !important;
+        }
+
+        .btn-micro {
+            padding: 5px 10px !important;
+            font-size: 0.65rem !important;
+            font-weight: 800 !important;
+            border-radius: 6px !important;
+            cursor: pointer !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            text-transform: uppercase !important;
+            line-height: 1 !important;
+            width: auto !important;
+            display: inline-block !important;
+            margin: 2px !important;
+            transition: all 0.2s !important;
+            color: #fff !important;
+        }
+
+        .btn-micro:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        /* --- 🚨 ULTIMATE WHITE TEXT OVERRIDE 🚨 --- */
+        input,
+        select,
+        textarea,
+        .pro-input,
+        .pro-input-micro,
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        input[type="number"],
+        input[type="tel"],
+        select option {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            /* Para navegadores basados en Webkit/Chrome */
+        }
+
+        /* Asegurar que el texto que el usuario escribe sea blanco */
+        input:focus,
+        select:focus,
+        textarea:focus {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        /* Mantener las opciones del desplegable legibles (Fondo blanco, texto negro al abrir) */
+        select option {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+        }
+    </style>
+
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+    <script>
+        // Emergency logger for head load
+        console.log('🏁 Admin.html shell started parsing');
+    </script>
+</head>
+
+<body>
+
+    <!-- Auth Modal for Admin -->
+    <div id="admin-auth-modal" class="modal-overlay auth-overlay-enterprise">
+        <div class="modal-content admin-login-card">
+            <div style="text-align: center; margin-bottom: 2.5rem;">
+                <img src="img/logo_somospadel.png"
+                    style="height: 100px; margin-bottom: 1.5rem; filter: drop-shadow(0 0 15px var(--primary-glow));"
+                    alt="Somos Padel">
+                <h2
+                    style="color: white !important; font-weight: 900; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,0,0,0.5);">
+                    ACCESO PRIVADO</h2>
+                <div
+                    style="color: var(--primary); font-size: 0.7rem; font-weight: 800; letter-spacing: 3px; margin-top: 5px;">
+                    APP SOMOSPADEL BCN</div>
+            </div>
+            <form id="admin-login-form" class="pro-form"
+                onsubmit="event.preventDefault(); document.getElementById('admin-login-btn').click(); return false;">
+                <div class="form-group">
+                    <label
+                        style="color: rgba(255,255,255,0.7); text-align: center; width: 100%; letter-spacing: 1px;">CÓDIGO
+                        DE ACCESO (6 DÍGITOS)</label>
+                    <input type="tel" name="pin" id="pin-input" placeholder="------" class="pro-input"
+                        style="text-align: center; letter-spacing: 15px; font-size: 1.8rem; font-weight: 900; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); color: var(--brand-neon, #ccff00);"
+                        maxlength="6" inputmode="numeric" required autofocus autocomplete="off">
+                </div>
+
+                <div class="form-group"
+                    style="flex-direction: row; align-items: center; gap: 10px; margin-top: 15px; justify-content: center;">
+                    <input type="checkbox" name="remember" id="remember-me" style="width: auto;">
+                    <label for="remember-me"
+                        style="margin: 0; color: rgba(255,255,255,0.8); font-size: 0.8rem;">Mantener sesión
+                        iniciada</label>
+                </div>
+
+                <button type="button" id="admin-login-btn" class="btn-primary-pro"
+                    onclick="const val = document.getElementById('pin-input').value; console.log('PIN Submitted:', val); if(window.AdminAuth) { window.AdminAuth.login(val); } else { alert('Error: AdminAuth no cargado'); }"
+                    style="width: 100%; padding: 1.2rem; margin-top: 1.5rem; font-size: 1.1rem; letter-spacing: 2px;">ENTRAR
+                    A LA APP 🚀</button>
+
+                <div id="admin-login-error"
+                    style="color: var(--danger); margin-top: 1.2rem; text-align: center; font-size: 0.85rem; font-weight: 700; min-height: 20px;">
+                </div>
+
+                <div
+                    style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; text-align: center;">
+                    <p style="color: rgba(255,255,255,0.4); font-size: 0.7rem;">ACCESO RESTRINGIDO POR ROLES</p>
+                    <div style="display: flex; justify-content: center; gap: 10px; margin-top: 5px; opacity: 0.5;">
+                        <span style="font-size: 1.2rem;" title="Super Admin">👑</span>
+                        <span style="font-size: 1.2rem;" title="Admin">🛡️</span>
+                        <span style="font-size: 1.2rem;" title="Captain">🧢</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-shell">
+        <!-- Mobile Menu Button -->
+        <button id="mobile-menu-btn" class="mobile-menu-toggle" onclick="toggleAdminSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Sidebar Overlay for Mobile -->
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleAdminSidebar()"></div>
+
+        <!-- Enterprise Admin Sidebar -->
+        <aside id="admin-sidebar" class="sidebar-pro">
+            <div class="brand-top-left">
+                <img src="img/logo_somospadel.png" class="brand-logo-main" alt="Somos Padel Logo">
+                <div class="brand-text-main">
+                    <span class="name">APP SOMOSPADEL</span>
+                    <span class="location">BCN</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-item-pro nav-item-back"
+                    style="text-decoration: none; margin-bottom: 2rem;">
+                    <span class="icon-box"><i class="fas fa-arrow-left"></i></span>
+                    <span class="nav-text">Dashboard Jugador</span>
+                </a>
+
+                <button class="nav-item-pro active" data-view="users" onclick="loadAdminView('users')">
+                    <span class="icon-box"><i class="fas fa-users-gear"></i></span>
+                    <span class="nav-text">Base de Datos</span>
+                </button>
+
+                <button class="nav-item-pro nav-group-americana" data-view="americanas_mgmt"
+                    onclick="loadAdminView('americanas_mgmt')">
+                    <span class="icon-box"><i class="fas fa-calendar-check"></i></span>
+                    <span class="nav-text">Gestión Americanas</span>
+                </button>
+
+                <button class="nav-item-pro nav-group-americana" data-view="matches" onclick="loadAdminView('matches')">
+                    <span class="icon-box"><i class="fas fa-trophy-award"></i></span>
+                    <span class="nav-text">Resultados Americanas</span>
+                </button>
+
+                <button class="nav-item-pro nav-group-americana" data-view="simulator_empty"
+                    onclick="loadAdminView('simulator_empty')">
+                    <span class="icon-box"><i class="fas fa-robot"></i></span>
+                    <span class="nav-text">Simulador de Americanas</span>
+                </button>
+
+                <!-- NEW AUTOPILOT TAB -->
+                <button class="nav-item-pro" data-view="autopilot" onclick="loadAdminView('autopilot')"
+                    style="border:1px solid rgba(204,255,0,0.3); background:rgba(204,255,0,0.05);">
+                    <span class="icon-box"><i class="fas fa-wand-magic-sparkles"
+                            style="color:var(--brand-neon);"></i></span>
+                    <span class="nav-text" style="color:var(--brand-neon); font-weight:800;">AUTOPILOT 🤖</span>
+                </button>
+
+                <div
+                    style="margin: 15px 10px 5px 10px; padding: 10px; border-top: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); font-size: 0.65rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">
+                    Módulo Entrenos</div>
+
+                <button class="nav-item-pro nav-group-entreno" data-view="entrenos_mgmt"
+                    onclick="loadAdminView('entrenos_mgmt')">
+                    <span class="icon-box"><i class="fas fa-tasks"></i></span>
+                    <span class="nav-text">Gestor Entrenos</span>
+                </button>
+                <button class="nav-item-pro nav-group-entreno" data-view="entrenos_create"
+                    onclick="loadAdminView('entrenos_create')">
+                    <span class="icon-box"><i class="fas fa-plus-circle"></i></span>
+                    <span class="nav-text">Crear Entreno</span>
+                </button>
+
+                <button class="nav-item-pro nav-group-entreno" data-view="entrenos_results"
+                    onclick="loadAdminView('entrenos_results')">
+                    <span class="icon-box"><i class="fas fa-clipboard-check"></i></span>
+                    <span class="nav-text">Resultados Entrenos</span>
+                </button>
+
+                <button class="nav-item-pro nav-group-entreno" data-view="entrenos_simulator"
+                    onclick="loadAdminView('entrenos_simulator')">
+                    <span class="icon-box"><i class="fas fa-brain"></i></span>
+                    <span class="nav-text">Simulador de Entrenos</span>
+                </button>
+
+                <div
+                    style="margin: 15px 10px 5px 10px; padding: 10px; border-top: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); font-size: 0.65rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">
+                    Herramientas</div>
+
+                <button class="nav-item-pro" data-view="network_pulse" onclick="loadAdminView('network_pulse')"
+                    style="border:1px solid rgba(0, 227, 109, 0.3); background:rgba(0, 227, 109, 0.05);">
+                    <span class="icon-box"><i class="fas fa-tower-broadcast" style="color:#00E36D;"></i></span>
+                    <span class="nav-text" style="color:#00E36D; font-weight:800;">OP CENTER 🔬</span>
+                </button>
+
+                <button class="nav-item-pro nav-item-logout" style="margin-top: auto;" onclick="AdminAuth.logout()">
+                    <span class="icon-box"><i class="fas fa-power-off"></i></span>
+                    <span class="nav-text">Cerrar Sesión</span>
+                </button>
+            </nav>
+
+            <div class="user-profile-widget">
+                <div class="avatar-pro" id="admin-avatar">A</div>
+                <div class="user-meta">
+                    <div class="name" id="admin-name">Cargando...</div>
+                    <div class="role">Executive Admin</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Admin Workspace -->
+        <main class="main-wrapper">
+            <header class="top-bar">
+                <button id="mobile-menu-toggle" class="btn-micro mobile-only"
+                    style="margin-right: 15px; background: transparent; border: none; font-size: 1.5rem; color: white;">☰</button>
+                <div class="top-title" id="page-title">CONSOLA DE ADMINISTRACIÓN</div>
+                <div class="top-actions">
+                    <div class="conn-status">
+                        <span class="dot online"></span> CLOUD ACTIVE
+                    </div>
+                </div>
+            </header>
+
+            <div class="workspace-area">
+                <div id="content-area">
+                    <div class="loading-container">
+                        <div class="loader"></div>
+                        <p>Cargando panel...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit/Create User Modal -->
+    <div id="admin-user-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Editar Usuario</h2>
+                <button class="close-modal-btn" onclick="closeAdminModal()">&times;</button>
+            </div>
+            <form id="admin-user-form" class="pro-form compact-admin-form">
+                <input type="hidden" name="id">
+
+                <div class="form-row-compact">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> NOMBRE</label>
+                        <input type="text" name="name" class="pro-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-phone"></i> TELÉFONO</label>
+                        <input type="tel" name="phone" class="pro-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="position: relative;">
+                    <label style="color: var(--primary); font-weight: 800;"><i class="fas fa-lock"></i> CONTRASEÑA
+                        (PLAIN TEXT / HASH)</label>
+                    <div style="position: relative;">
+                        <input type="password" name="password" id="admin-user-pwd-input"
+                            placeholder="Escribir p. cambiar..." class="pro-input">
+                        <i class="fas fa-eye" id="toggle-admin-user-pwd"
+                            onclick="const i = document.getElementById('admin-user-pwd-input'); i.type = i.type === 'password' ? 'text' : 'password'; this.classList.toggle('fa-eye'); this.classList.toggle('fa-eye-slash');"
+                            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #888; z-index: 10;"></i>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label><i class="fas fa-chart-line"></i> NIVEL</label>
+                        <input type="text" name="level" class="pro-input" placeholder="Ej: 3,5" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-venus-mars"></i> GÉNERO</label>
+                        <select name="gender" class="pro-input">
+                            <option value="chico">CHICO</option>
+                            <option value="chica">CHICA</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-users-rectangle"></i> COMUNIDAD</label>
+                        <select name="membership" class="pro-input">
+                            <option value="externo">Externo</option>
+                            <option value="somospadel_bcn">SOMOSPADEL</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-user-tag"></i> ROL DE SISTEMA</label>
+                    <select name="role" class="pro-input">
+                        <option value="super_admin">SUPER ADMIN 👑</option>
+                        <option value="admin_player">ADMIN + JUGADOR 🎖️</option>
+                        <option value="admin">ADMIN (Solo Gestión) 🛡️</option>
+                        <option value="captain">CAPITÁN (Entrenos) 🧢</option>
+                        <option value="player_somospadel">JUGADOR SOMOSPADEL 🎾</option>
+                        <option value="player">JUGADOR EXTERNO 👤</option>
+                        <option value="collaborator">COLABORADOR 🤝</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label style="margin-bottom: 8px; color: var(--primary); font-weight: 700; font-size: 0.7rem;"><i
+                            class="fas fa-users-cog"></i> EQUIPOS SOMOSPADEL</label>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; padding: 2px;">
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="3º Masculino A"> <span>3º Masc A</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="3º Masculino B"> <span>3º Masc B</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="4º Masculino"> <span>4º Masc</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="4º Femenino"> <span>4º Fem</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="4º Mixto A"> <span>4º Mixto A</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="4º Mixto B"> <span>4º Mixto B</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="3º Mixto"> <span>3º Mixto</span></label>
+                        <label class="team-checkbox-label"><input type="checkbox" name="teams_somospadel_check"
+                                value="2º Femenino"> <span>2º Fem</span></label>
+                    </div>
+                </div>
+
+                <div class="form-row-compact">
+                    <div class="form-group">
+                        <label><i class="fas fa-toggle-on"></i> ESTADO</label>
+                        <select name="status" class="pro-input">
+                            <option value="active">Activo</option>
+                            <option value="pending">Pendiente</option>
+                            <option value="blocked">Bloqueado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-trophy"></i> PARTIDOS</label>
+                        <input type="number" name="matches_played" value="0" class="pro-input">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary-pro"
+                    style="width: 100%; margin-top: 5px; height: 44px; font-weight: 800;">GUARDAR CAMBIOS 💾</button>
+            </form>
+        </div>
+    </div>
+
+
+
+    <!-- Edit Entreno Modal (Cloned from Americana) -->
+    <div id="admin-entreno-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Editar Entreno</h2>
+                <button class="close-modal-btn"
+                    onclick="document.getElementById('admin-entreno-modal').classList.add('hidden')">&times;</button>
+            </div>
+            <form id="edit-entreno-form" class="pro-form compact-admin-form">
+                <input type="hidden" name="id">
+
+                <!-- Bloque 1: Identificación -->
+                <div class="form-group">
+                    <label><i class="fas fa-signature"></i> NOMBRE DEL ENTRENO</label>
+                    <input type="text" name="name" class="pro-input" required placeholder="Ej: Entreno de Tarde">
+                </div>
+
+                <!-- Bloque 2: Fecha y Hora -->
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar"></i> FECHA</label>
+                        <input type="date" name="date" class="pro-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-clock"></i> INICIO</label>
+                        <input type="time" name="time" class="pro-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-hourglass-end"></i> FIN</label>
+                        <input type="time" name="time_end" class="pro-input">
+                    </div>
+                </div>
+
+                <!-- Bloque 3: Configuración -->
+                <div class="form-row-compact">
+                    <div class="form-group">
+                        <label><i class="fas fa-tags"></i> CATEGORÍA</label>
+                        <select name="category" class="pro-input">
+                            <option value="open">TODOS</option>
+                            <option value="male">MASCULINA</option>
+                            <option value="female">FEMENINA</option>
+                            <option value="mixed">MIXTA</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> SEDE</label>
+                        <select name="location" class="pro-input">
+                            <option value="Barcelona Pádel el Prat">Barcelona Pádel el Prat</option>
+                            <option value="Delfos Cornellá">Delfos Cornellá</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row-compact">
+                    <div class="form-group">
+                        <label><i class="fas fa-users"></i> MODO PAREJAS</label>
+                        <select name="pair_mode" class="pro-input">
+                            <option value="fixed">🔒 PAREJA FIJA</option>
+                            <option value="rotating">🌪️ TWISTER</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-info-circle"></i> ESTADO</label>
+                        <select name="status" class="pro-input">
+                            <option value="open">ABIERTA</option>
+                            <option value="pairing">🔀 EMPAREJAMIENTO</option>
+                            <option value="live">🎾 EN JUEGO</option>
+                            <option value="finished">🏁 FINALIZADA</option>
+                            <option value="cancelled">⛔ ANULADO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Bloque 4: Logística y Precios -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label><i class="fas fa-table-tennis"></i> PISTAS</label>
+                        <input type="number" name="max_courts" class="pro-input" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-redo"></i> Nº PARTIDOS</label>
+                        <input type="number" name="rounds_count" class="pro-input" placeholder="6" value="6">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-euro-sign"></i> SOCIO</label>
+                        <input type="number" name="price_members" step="0.1" class="pro-input" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-euro-sign"></i> EXT.</label>
+                        <input type="number" name="price_external" step="0.1" class="pro-input" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-image"></i> IMAGEN (URL)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" name="image_url" id="edit-entreno-img-input" class="pro-input"
+                            placeholder="https://..." style="flex:1;">
+                    </div>
+
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px;">
+                        <!-- PRAT -->
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno masculino prat.jpg')"
+                            style="background: #25d366; color: black;">Prat Masc</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno femenino prat.jpg')"
+                            style="background: #ff69b4; color: black;">Prat Fem</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno mixto prat.jpg')"
+                            style="background: #ccff00; color: black;">Prat Mixto</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno todo prat.jpg')"
+                            style="background: #ffffff; color: black;">Prat Todo</button>
+
+                        <!-- DELFOS -->
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno masculino delfos.jpg')"
+                            style="background: #25d366; color: black;">Delfos Masc</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno femenino delfos.jpg')"
+                            style="background: #ff69b4; color: black;">Delfos Fem</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno mixto delfos.jpg')"
+                            style="background: #ccff00; color: black;">Delfos Mixto</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/entreno todo delfos.jpg')"
+                            style="background: #ffffff; color: black;">Delfos Todo</button>
+
+                        <!-- AMERICANA -->
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/americana masculina.jpg')"
+                            style="background: #25d366; color: black;">Amer. Masc</button>
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/americana femeninas.jpg')"
+                            style="background: #ff69b4; color: black;">Amer. Fem</button>
+                        <button type="button" class="btn-micro" onclick="selectEntrenoImage('img/americana mixta.jpg')"
+                            style="background: #ccff00; color: black;">Amer. Mixta</button>
+
+                        <!-- OTRAS -->
+                        <button type="button" class="btn-micro"
+                            onclick="selectEntrenoImage('img/ball-mixta.png')">Pelota</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary-pro"
+                    style="width: 100%; margin-top: 0.5rem; height: 44px; font-weight: 800; letter-spacing: 1px;">LANZAR
+                    EVENTO 🚀</button>
+            </form>
+
+            <!-- PARTICIPANTS MANAGEMENT SECTION -->
+            <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
+                <h3 style="color: var(--primary); font-size: 1rem; margin-bottom: 1rem;">GESTIONAR
+                    PARTICIPANTES</h3>
+
+                <!-- Add Player Control -->
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem; align-items: flex-start;">
+                    <div id="autocomplete-container-entreno" style="flex: 1;"></div>
+                </div>
+
+                <!-- Participants List -->
+                <div id="participants-list-entreno"
+                    style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+                    <!-- Populated via JS -->
+                    <div style="text-align: center; color: #888; font-size: 0.8rem; padding: 10px;">
+                        Cargando
+                        participantes...</div>
+                </div>
+
+                <!-- FIXED PAIRS MANAGEMENT AREA (Injected via AdminPairsUI) -->
+                <div id="entreno-fixed-pairs-area" style="margin-top: 20px;"></div>
+            </div>
+
+            <!-- WAITLIST MANAGEMENT SECTION -->
+            <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
+                <h3 style="color: #FFA500; font-size: 1rem; margin-bottom: 1rem;">
+                    <i class="fas fa-clock"></i> LISTA DE RESERVA
+                </h3>
+
+                <div id="waitlist-entreno"
+                    style="max-height: 150px; overflow-y: auto; background: rgba(255,165,0,0.1); border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                    <!-- Populated via JS -->
+                    <div style="text-align: center; color: #888; font-size: 0.8rem; padding: 10px;">
+                        Cargando lista de reserva...
+                    </div>
+                </div>
+
+                <button id="btn-promote-waitlist-entreno" class="btn-primary-pro"
+                    style="width: 100%; background: #FFA500; color: white;">
+                    ⬆️ PROMOVER SIGUIENTE DE LA LISTA
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+
+    </div>
+    </div>
+
+    <!-- Edit Americana Modal -->
+    <div id="admin-americana-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Editar Americana</h2>
+                <button class="close-modal-btn" onclick="closeAmericanaModal()">&times;</button>
+            </div>
+            <form id="edit-americana-form" class="pro-form compact-admin-form">
+                <input type="hidden" name="id">
+
+                <!-- Bloque 1: Identificación -->
+                <div class="form-group">
+                    <label><i class="fas fa-trophy"></i> NOMBRE DE LA AMERICANA</label>
+                    <input type="text" name="name" class="pro-input" required placeholder="AMERICANA...">
+                </div>
+
+                <!-- Bloque 2: Fecha y Hora -->
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-alt"></i> FECHA</label>
+                        <input type="date" name="date" class="pro-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-clock"></i> INICIO</label>
+                        <input type="time" name="time" class="pro-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-hourglass-end"></i> FIN</label>
+                        <input type="time" name="time_end" class="pro-input">
+                    </div>
+                </div>
+
+                <!-- Bloque 3: Configuración -->
+                <div class="form-row-compact">
+                    <div class="form-group">
+                        <label><i class="fas fa-tags"></i> CATEGORÍA</label>
+                        <select name="category" class="pro-input">
+                            <option value="open">TODOS</option>
+                            <option value="male">MASCULINA</option>
+                            <option value="female">FEMENINA</option>
+                            <option value="mixed">MIXTA</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> SEDE</label>
+                        <select name="location" class="pro-input">
+                            <option value="Barcelona Pádel el Prat">Barcelona Pádel el Prat</option>
+                            <option value="Delfos Cornellá">Delfos Cornellá</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row-compact">
+                    <div class="form-group">
+                        <label><i class="fas fa-users"></i> MODO PAREJAS</label>
+                        <select name="pair_mode" class="pro-input">
+                            <option value="fixed">🔒 PAREJA FIJA</option>
+                            <option value="rotating">🌪️ TWISTER</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-info-circle"></i> ESTADO</label>
+                        <select name="status" class="pro-input">
+                            <option value="open">ABIERTA</option>
+                            <option value="pairing">🔀 EMPAREJAMIENTO</option>
+                            <option value="live">🎾 EN JUEGO</option>
+                            <option value="finished">🏁 FINALIZADA</option>
+                            <option value="cancelled">⛔ ANULADO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Bloque 4: Logística y Precios -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                        <label><i class="fas fa-table-tennis"></i> PISTAS</label>
+                        <input type="number" name="max_courts" class="pro-input" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-euro-sign"></i> SOCIO</label>
+                        <input type="number" name="price_members" step="0.1" class="pro-input" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-euro-sign"></i> EXT.</label>
+                        <input type="number" name="price_external" step="0.1" class="pro-input" placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Bloque 5: Imagen -->
+                <div class="form-group">
+                    <label><i class="fas fa-image"></i> IMAGEN (URL)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" name="image_url" id="edit-img-input" class="pro-input"
+                            placeholder="https://..." style="flex:1;">
+                    </div>
+
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px;">
+                        <!-- AMERICANA -->
+                        <button type="button" class="btn-micro" onclick="selectImage('img/americana masculina.jpg')"
+                            style="background: #25d366; color: black;">Masc</button>
+                        <button type="button" class="btn-micro" onclick="selectImage('img/americana femeninas.jpg')"
+                            style="background: #ff69b4; color: black;">Fem</button>
+                        <button type="button" class="btn-micro" onclick="selectImage('img/americana mixta.jpg')"
+                            style="background: #ccff00; color: black;">Mixta</button>
+
+                        <!-- PRAT -->
+                        <button type="button" class="btn-micro" onclick="selectImage('img/entreno todo prat.jpg')"
+                            style="background: #ffffff; color: black;">Prat</button>
+
+                        <!-- DELFOS -->
+                        <button type="button" class="btn-micro" onclick="selectImage('img/entreno todo delfos.jpg')"
+                            style="background: #ffffff; color: black;">Delfos</button>
+
+                        <button type="button" class="btn-micro"
+                            onclick="selectImage('img/ball-mixta.png')">Pelota</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; text-align: center;">
+                    <img id="edit-americana-img-preview" src=""
+                        style="max-height: 80px; border-radius: 8px; border: 1px solid var(--primary); display: none;"
+                        onerror="this.style.display='none'">
+                </div>
+
+                <button type="submit" class="btn-primary-pro"
+                    style="width: 100%; margin-top: 0.5rem; height: 44px; font-weight: 800;">GUARDAR CAMBIOS 💾</button>
+            </form>
+
+            <!-- PARTICIPANTS MANAGEMENT SECTION -->
+            <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
+                <h3 style="color: var(--primary); font-size: 1rem; margin-bottom: 1rem;">GESTIONAR
+                    PARTICIPANTES</h3>
+
+                <!-- Add Player Control -->
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem; align-items: flex-start;">
+                    <div id="autocomplete-container-americana" style="flex: 1;"></div>
+                </div>
+
+                <!-- Participants List -->
+                <div id="participants-list"
+                    style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+                    <!-- Populated via JS -->
+                    <div style="text-align: center; color: #888; font-size: 0.8rem; padding: 10px;">
+                        Cargando
+                        participantes...</div>
+                </div>
+
+                <!-- FIXED PAIRS MANAGEMENT AREA (Injected via AdminPairsUI) -->
+                <div id="americana-fixed-pairs-area" style="margin-top: 20px;"></div>
+            </div>
+
+
+            <!-- Dynamic Menu Modal (HAMB) -->
+            <div id="admin-menu-modal" class="modal-overlay hidden">
+                <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-header">
+                        <h2>Gestionar Botón Menú</h2>
+                        <button class="close-modal-btn"
+                            onclick="document.getElementById('admin-menu-modal').classList.add('hidden')">&times;</button>
+                    </div>
+                    <form id="admin-menu-form" class="pro-form">
+                        <input type="hidden" name="id">
+
+                        <div class="form-group">
+                            <label>TÍTULO DEL BOTÓN</label>
+                            <input type="text" name="title" placeholder="Ej: Mi Perfil" class="pro-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ICONO (FontAwesome class)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" name="icon" id="menu-icon-input" placeholder="fas fa-star"
+                                    class="pro-input" required style="flex:1;">
+                                <div id="icon-preview-box"
+                                    style="width: 50px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; border: 1px solid rgba(255,255,255,0.1);">
+                                    <i class="fas fa-question"></i>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px;">
+                                <button type="button" class="btn-micro" onclick="selectMenuIcon('fas fa-user')"><i
+                                        class="fas fa-user"></i></button>
+                                <button type="button" class="btn-micro"
+                                    onclick="selectMenuIcon('fas fa-calendar-alt')"><i
+                                        class="fas fa-calendar-alt"></i></button>
+                                <button type="button" class="btn-micro" onclick="selectMenuIcon('fas fa-trophy')"><i
+                                        class="fas fa-trophy"></i></button>
+                                <button type="button" class="btn-micro" onclick="selectMenuIcon('fas fa-chart-line')"><i
+                                        class="fas fa-chart-line"></i></button>
+                                <button type="button" class="btn-micro" onclick="selectMenuIcon('fas fa-shield-alt')"><i
+                                        class="fas fa-shield-alt"></i></button>
+                                <button type="button" class="btn-micro" onclick="selectMenuIcon('fas fa-headset')"><i
+                                        class="fas fa-headset"></i></button>
+                                <button type="button" class="btn-micro"
+                                    onclick="selectMenuIcon('fas fa-info-circle')"><i
+                                        class="fas fa-info-circle"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ACCIÓN / RUTA</label>
+                            <input type="text" name="action" placeholder="dashboard o https://..." class="pro-input"
+                                required>
+                            <small style="color: #888; font-size: 0.65rem;">Internas: dashboard,
+                                profile, americanas,
+                                ranking. Externas: https://...</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>SUBPESTAÑA (Opcional)</label>
+                            <input type="text" name="subcategory" placeholder="Ej: DISPONIBLES, FINALIZADAS, INFO"
+                                class="pro-input">
+                            <small style="color: #888; font-size: 0.65rem;">Texto que aparece debajo del título en el
+                                menú</small>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label>ORDEN</label>
+                                <input type="number" name="order" value="10" class="pro-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label>ESTADO</label>
+                                <select name="active" class="pro-input">
+                                    <option value="true">ACTIVO (Visible)</option>
+                                    <option value="false">INACTIVO (Oculto)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-primary-pro" style="width: 100%; margin-top: 1rem;">GUARDAR
+                            CONFIGURACIÓN</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Analytics & Export -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js?v=999"></script>
+            <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js?v=999"></script>
+
+            <!-- Firebase SDK (v10 Compat) -->
+            <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+            <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+            <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+            <!-- App Logic: Config Inline to prevent Mobile Cache Errors -->
+            <script>
+                window.FIREBASE_CONFIG = {
+                    apiKey: "AIzaSyBCy8nN4wKL2Cqvxp_mkmYpsA923N1g5iE",
+                    authDomain: "americanas-somospadel.firebaseapp.com",
+                    projectId: "americanas-somospadel",
+                    storageBucket: "americanas-somospadel.firebasestorage.app",
+                    messagingSenderId: "638578709472",
+                    appId: "1:638578709472:web:bf99bbb7688a947b4bd185"
+                };
+            </script>
+            <script src="js/firebase-init.js?v=5005"></script>
+
+            <!-- NEW ARCHITECTURE: CORE & SERVICES -->
+            <script src="js/modules/core/Constants.js?v=2000"></script>
+            <!-- Module Logic -->
+            <script src="js/modules/ui/PlayerAutocomplete.js"></script>
+            <script src="js/modules/common/EventService.js"></script>
+            <script src="js/modules/common/ParticipantService.js?v=2001"></script>
+            <script src="js/modules/common/NotificationService.js?v=3000"></script>
+            <script src="js/modules/ui/NotificationUi.js?v=3000"></script>
+
+            <!-- LOGIC MODULES (Legacy Logic Wrapped) -->
+
+            <!-- SIMULATOR LOGIC -->
+            <!-- SIMULATOR LOGIC (Moved to end) -->
+
+            <!-- LEGACY SERVICES (Keep for compatibility if needed during transition) -->
+            <!-- AmericanaService duplicated above -->
+
+            <!-- Logic Services (CORE) -->
+            <script src="js/fixed-pairs-logic.js?v=5000"></script>
+            <script src="js/rotating-pozo-logic.js?v=5003"></script>
+            <script src="js/MatchMakingService.js?v=5003"></script>
+            <script src="js/modules/logic/LevelAdjustmentService.js"></script>
+            <script>
+                if (!window.MatchMakingService) {
+                    console.error("❌ CRITICAL: MatchMakingService Failed to Load from ROOT!");
+                    alert("FATAL ERROR: MatchMakingService.js no se ha cargado.");
+                } else {
+                    console.log("✅ MatchMakingService Verified Loaded in Admin.html");
+                }
+            </script>
+
+            <!-- Admin Modules (Lazy Loaded Logic) -->
+            <script src="js/modules/logic/LevelReliabilityService.js"></script>
+            <script src="js/modules/logic/SmartAlertsService.js"></script>
+            <script src="js/modules/admin/AutopilotView.js"></script>
+
+            <!-- Simulator (View) -->
+            <script src="js/admin-simulator.js?v=5000"></script>
+            <script src="js/modules/admin-simulator-view.js?v=5000"></script>
+            <script src="js/modules/logic/TwisterSimulation.js?v=1"></script>
+            <script src="js/modules/admin-pairs-ui.js?v=2000"></script>
+            <script src="js/modules/admin-results.js?v=4009"></script>
+            <script src="js/modules/admin-users.js?v=1105"></script>
+            <script src="js/modules/admin-americanas.js?v=4007"></script>
+            <script src="js/modules/common/WhatsAppService.js?v=7015"></script>
+            <script src="js/modules/admin-entrenos.js?v=5010"></script>
+
+
+            <!-- DIAGNOSTIC SCRIPT (Optional) -->
+            <script>
+                console.log("🔍 [DIAGNOSTIC] Checking AmericanaService...");
+                setTimeout(() => {
+                    if (window.AmericanaService) {
+                        console.log("✅ AmericanaService exists:", window.AmericanaService);
+                        if (window.AmericanaService.db) {
+                            console.log("✅ AmericanaService.db initialized");
+                        } else {
+                            console.error("❌ AmericanaService.db is undefined");
+                        }
+                    } else {
+                        console.error("❌ window.AmericanaService is undefined");
+                        console.log("Available window properties:", Object.keys(window).filter(k => k.includes('Americana')));
+                    }
+                }, 2000);
+            </script>
+
+            <!-- Admin Modules & Services -->
+            <script src="js/modules/core/NetworkPulseService.js"></script>
+            <script src="js/modules/admin/NetworkPulseView.js"></script>
+
+            <!-- Admin UI Logic (MAIN) -->
+            <script src="js/admin.js?v=1120"></script>
+
+            <!-- DIAGNOSTIC CONSOLE -->
+            <div id="debug-console"
+                style="position: fixed; bottom: 0; left: 0; width: 100%; background: #000; color: #0f0; border-top: 2px solid #0f0; padding: 10px; font-family: monospace; font-size: 12px; z-index: 99999; max-height: 150px; overflow-y: auto; display: none;">
+                <div>🚀 CONSOLA DE DIAGNÓSTICO (v2.0)</div>
+            </div>
+            <script>
+                window.onerror = function (msg, url, line) {
+                    const c = document.getElementById('debug-console');
+                    if (c) { c.style.display = 'block'; c.innerHTML += `<div style="color:red">❌ ${msg} (L${line})</div>`; }
+                };
+                window.onunhandledrejection = function (e) {
+                    const c = document.getElementById('debug-console');
+                    if (c) { c.style.display = 'block'; c.innerHTML += `<div style="color:yellow">⚠️ PROMISE: ${e.reason}</div>`; }
+                };
+
+                // Mobile Sidebar Toggle Function
+                function toggleAdminSidebar() {
+                    const sidebar = document.getElementById('admin-sidebar');
+                    const overlay = document.getElementById('sidebar-overlay');
+
+                    if (sidebar && overlay) {
+                        sidebar.classList.toggle('open');
+                        overlay.classList.toggle('active');
+                    }
+                }
+            </script>
+
+            <!-- Mobile Responsive Styles -->
+            <style>
+                /* Mobile Menu Button */
+                .mobile-menu-toggle {
+                    display: none;
+                    position: fixed;
+                    top: 20px;
+                    left: 20px;
+                    z-index: 1001;
+                    background: var(--brand-neon);
+                    border: none;
+                    width: 50px;
+                    height: 50px;
+                    border-radius: 12px;
+                    color: #000;
+                    font-size: 1.5rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 15px rgba(204, 255, 0, 0.3);
+                    transition: all 0.3s ease;
+                }
+
+                .mobile-menu-toggle:hover {
+                    transform: scale(1.05);
+                    box-shadow: 0 6px 20px rgba(204, 255, 0, 0.5);
+                }
+
+                /* Sidebar Overlay */
+                .sidebar-overlay {
+                    display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    z-index: 999;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }
+
+                .sidebar-overlay.active {
+                    opacity: 1;
+                }
+
+                /* Mobile & Tablet Responsive - Premium Menu Fixed */
+                /* Mobile & Tablet Responsive - Full Viewport Width Force */
+                /* Mobile & Tablet Responsive - Full Viewport Width Force (Stacking Context Fix) */
+                @media (max-width: 1024px) {
+                    :root {
+                        --admin-sticky-top: 110px !important;
+                    }
+
+
+                    /* Ocultar elementos innecesarios */
+                    .mobile-menu-toggle,
+                    .sidebar-overlay,
+                    .brand-top-left,
+                    .user-profile-widget,
+                    #mobile-menu-toggle,
+                    .btn-micro.mobile-only {
+                        display: none !important;
+                    }
+
+                    /* 
+                       RESET CRÍTICO DEL CONTENEDOR PADRE 
+                       ----------------------------------
+                       Eliminamos transformaciones, filtros y containment para asegurar
+                       que position: fixed sea relativo al viewport y NO al .app-shell.
+                       También permitimos overflow visible para que no recorte.
+                    */
+                    .app-shell {
+                        display: block !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 100vh;
+                        transform: none !important;
+                        filter: none !important;
+                        perspective: none !important;
+                        contain: none !important;
+                        overflow: visible !important;
+                        /* CRITICO: Permitir que los hijos salgan */
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        position: static !important;
+                        /* Desactivar posicionamiento relativo */
+                    }
+
+                    body {
+                        overflow-x: hidden;
+                        /* Controlar scroll horizontal global aquí */
+                        background: #0a0a0f;
+                        /* Color de fondo seguro */
+                        margin: 0;
+                        padding: 0;
+                    }
+
+                    /* 
+                       BARRA SUPERIOR FIJA - LIBERADA
+                       ------------------------------
+                    */
+                    .sidebar-pro {
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        width: 100vw !important;
+                        max-width: none !important;
+                        /* Prevenir límites heredados */
+                        min-width: 100vw !important;
+                        height: 95px !important;
+                        max-height: 95px !important;
+                        z-index: 2147483647;
+                        background: rgba(8, 8, 12, 0.98) !important;
+                        backdrop-filter: blur(10px);
+                        -webkit-backdrop-filter: blur(10px);
+                        border-bottom: 1px solid rgba(204, 255, 0, 0.3);
+                        box-shadow: 0 5px 30px rgba(0, 0, 0, 0.9);
+                        display: flex;
+                        flex-direction: row;
+                        align-items: center;
+                        padding: 0;
+                        margin: 0 !important;
+                        box-sizing: border-box;
+                    }
+
+                    /* 
+                       CONTENEDOR SCROLL 
+                    */
+                    /* 
+                       CONTENEDOR SCROLL - CON SCROLLBAR VISIBLE
+                    */
+                    .nav-menu {
+                        display: flex;
+                        flex-direction: row;
+                        align-items: center;
+                        justify-content: flex-start;
+                        gap: 12px;
+                        padding: 0 15px 5px 15px;
+                        /* Espacio inferior para scrollbar */
+                        width: 100vw !important;
+                        max-width: none !important;
+                        height: 100%;
+                        overflow-x: auto !important;
+                        -webkit-overflow-scrolling: touch;
+
+                        /* Scrollbar Firefox */
+                        scrollbar-width: thin;
+                        scrollbar-color: var(--brand-neon) transparent;
+                    }
+
+                    /* Scrollbar Webkit (Chrome, Safari, etc) */
+                    .nav-menu::-webkit-scrollbar {
+                        display: block !important;
+                        height: 3px;
+                        background: rgba(255, 255, 255, 0.02);
+                    }
+
+                    .nav-menu::-webkit-scrollbar-thumb {
+                        background: var(--brand-neon);
+                        border-radius: 10px;
+                        box-shadow: 0 0 4px var(--brand-neon);
+                    }
+
+                    .nav-menu::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+
+                    /* 
+                       BOTONES DE NAVEGACIÓN 
+                    */
+                    .nav-item-pro {
+                        flex: 0 0 auto;
+                        display: flex;
+                        flex-direction: column !important;
+                        align-items: center;
+                        justify-content: center;
+                        width: 80px !important;
+                        height: 70px !important;
+                        padding: 4px !important;
+                        background: rgba(255, 255, 255, 0.05);
+                        border-radius: 12px;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        margin: 0 !important;
+                        text-decoration: none !important;
+                    }
+
+                    /* Estado Activo */
+                    .nav-item-pro.active {
+                        background: rgba(204, 255, 0, 0.15) !important;
+                        border: 1px solid var(--brand-neon) !important;
+                        box-shadow: 0 0 10px rgba(204, 255, 0, 0.2);
+                    }
+
+                    .nav-item-pro.active .icon-box {
+                        color: var(--brand-neon) !important;
+                    }
+
+                    .nav-item-pro.active .nav-text {
+                        color: #fff !important;
+                        font-weight: 700;
+                    }
+
+                    /* Iconos */
+                    .icon-box {
+                        width: auto !important;
+                        height: auto !important;
+                        font-size: 1.4rem !important;
+                        margin-bottom: 3px !important;
+                        color: rgba(255, 255, 255, 0.7);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+
+                    /* Texto */
+                    .nav-text {
+                        font-size: 0.55rem !important;
+                        text-transform: uppercase;
+                        letter-spacing: 0.3px;
+                        text-align: center;
+                        line-height: 1.1;
+                        white-space: normal;
+                        color: rgba(255, 255, 255, 0.6);
+                        width: 100%;
+                        max-height: 2.4em;
+                        overflow: hidden;
+                    }
+
+                    /* Separadores ocultos */
+                    .nav-menu>div {
+                        display: none;
+                    }
+
+                    /* Contenido Principal */
+                    .main-content-pro {
+                        margin-left: 0 !important;
+                        margin-top: 100px !important;
+                        width: 100% !important;
+                        padding: 15px !important;
+                        box-sizing: border-box;
+                    }
+
+                    /* 
+                       ADAPTACIÓN DE CONTENIDO MÓVIL (Tablas y Formularios)
+                       ----------------------------------------------------
+                    */
+
+                    /* 1. Layout General y Tipografía */
+                    body,
+                    .app-shell {
+                        font-size: 14px !important;
+                    }
+
+                    .main-content-pro {
+                        padding: 10px !important;
+                    }
+
+                    /* Títulos compactos */
+                    h1,
+                    .page-title {
+                        font-size: 1.3rem !important;
+                        margin-bottom: 12px !important;
+                        line-height: 1.2 !important;
+                        word-wrap: break-word;
+                    }
+
+                    /* MODAL MOBILE FIXES */
+                    .modal-content {
+                        max-height: 90vh !important;
+                        /* Ensure it fits on screen */
+                        overflow-y: auto !important;
+                        /* Allow scrolling */
+                        -webkit-overflow-scrolling: touch;
+                        padding-bottom: 50px !important;
+                        /* Space for bottom content */
+                    }
+
+                    /* --- MOBILE MODAL FIXES --- */
+                    @media (max-width: 480px) {
+                        .modal-content {
+                            width: 95% !important;
+                            max-height: 90vh !important;
+                            overflow-y: auto !important;
+                            padding: 15px !important;
+                        }
+
+                        .modal-body {
+                            display: flex;
+                            flex-direction: column;
+                        }
+
+                        .modal-body>div {
+                            width: 100% !important;
+                        }
+                    }
+
+                    /* --- WOW EFFECTS (LIVE MATCHES) --- */
+                    @keyframes neonPulse {
+                        0% {
+                            box-shadow: 0 0 5px rgba(204, 255, 0, 0.2), 0 0 10px rgba(204, 255, 0, 0.1);
+                            border-color: rgba(204, 255, 0, 0.5);
+                        }
+
+                        50% {
+                            box-shadow: 0 0 20px rgba(204, 255, 0, 0.6), 0 0 30px rgba(204, 255, 0, 0.4);
+                            border-color: #CCFF00;
+                        }
+
+                        100% {
+                            box-shadow: 0 0 5px rgba(204, 255, 0, 0.2), 0 0 10px rgba(204, 255, 0, 0.1);
+                            border-color: rgba(204, 255, 0, 0.5);
+                        }
+                    }
+
+                    .match-card-live {
+                        animation: neonPulse 2s infinite ease-in-out;
+                        background: radial-gradient(circle at center, rgba(204, 255, 0, 0.03) 0%, rgba(255, 255, 255, 1) 100%) !important;
+                        transform: scale(1.02);
+                        z-index: 10;
+                        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    }
+
+                    .status-badge-live {
+                        background: #CCFF00;
+                        color: black !important;
+                        box-shadow: 0 0 10px #ccff00;
+                        padding: 4px 12px !important;
+                        border-radius: 12px;
+                        font-size: 0.7rem !important;
+                        font-weight: 900 !important;
+                        text-transform: uppercase;
+                        animation: blink 1s infinite alternate;
+                    }
+
+                    @keyframes blink {
+                        from {
+                            opacity: 1;
+                        }
+
+                        to {
+                            opacity: 0.7;
+                        }
+                    }
+
+                    /* Fix specific form layouts on mobile */
+                    .modal-content .form-group {
+                        margin-bottom: 10px;
+                    }
+
+                    /* Stack grids on mobile */
+                    .modal-content div[style*="grid-template-columns"] {
+                        grid-template-columns: 1fr !important;
+                        gap: 10px !important;
+                    }
+                }
+
+                h2,
+                h3,
+                .section-title {
+                    font-size: 1.1rem !important;
+                    margin-bottom: 10px !important;
+                }
+
+                p,
+                span,
+                label {
+                    font-size: 0.9rem !important;
+                    line-height: 1.3;
+                }
+
+                /* 2. Tarjetas y Contenedores */
+                .card,
+                .stat-card,
+                .dashboard-card {
+                    padding: 12px !important;
+                    margin-bottom: 12px !important;
+                    border-radius: 10px !important;
+                }
+
+                .modal-content {
+                    width: 94% !important;
+                    max-width: 94% !important;
+                    padding: 15px !important;
+                    margin: 10px auto !important;
+                    border-radius: 12px !important;
+                }
+
+                /* 3. Formularios: Vertical Stack */
+                .pro-form div[style*="grid-template-columns"],
+                .modal-content div[style*="grid-template-columns"] {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 12px !important;
+                    grid-template-columns: 1fr !important;
+                }
+
+                .pro-input,
+                select.pro-input {
+                    font-size: 16px !important;
+                    /* Previene zoom iOS */
+                    height: 44px !important;
+                    padding: 8px 10px !important;
+                }
+
+                label {
+                    display: block;
+                    margin-bottom: 4px !important;
+                    font-size: 0.75rem !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: rgba(255, 255, 255, 0.7) !important;
+                }
+
+                /* 4. Tablas Inteligentes */
+                .table-container,
+                .table-responsive,
+                .datatable-wrapper {
+                    display: block !important;
+                    width: 100% !important;
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch;
+                    padding-bottom: 8px;
+                    margin-bottom: 15px;
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    /* Borde sutil */
+                    border-radius: 8px;
+                }
+
+                table {
+                    width: 100% !important;
+                    min-width: 600px !important;
+                    border-collapse: collapse;
+                }
+
+                /* Celdas que respiran */
+                th {
+                    font-size: 0.7rem !important;
+                    text-transform: uppercase;
+                    padding: 8px 6px !important;
+                    white-space: nowrap !important;
+                    background: rgba(255, 255, 255, 0.03);
+                }
+
+                td {
+                    padding: 10px 6px !important;
+                    font-size: 0.8rem !important;
+                    white-space: normal !important;
+                    /* Permite wrap */
+                    word-break: break-word;
+                    vertical-align: middle;
+                    line-height: 1.2;
+                }
+
+                /* 5. Botones y Acciones */
+                .action-buttons {
+                    display: flex;
+                    gap: 5px;
+                    flex-wrap: wrap;
+                    /* Botones pasan a nueva línea si no caben */
+                }
+
+                .btn-icon {
+                    padding: 0 !important;
+                    width: 32px !important;
+                    height: 32px !important;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 6px !important;
+                }
+
+                .btn-primary,
+                .btn-primary-pro,
+                .btn-danger,
+                .btn-secondary {
+                    width: 100% !important;
+                    padding: 12px !important;
+                    margin-top: 8px;
+                    font-size: 0.95rem !important;
+                    font-weight: 600;
+                    border-radius: 8px !important;
+                }
+            </style>
+
+            <!-- CONSOLA DE EMERGENCIA INTEGRADA -->
+            <div id="emergency-console"
+                style="display:none; position:fixed; bottom:0; left:0; right:0; height:300px; background:#1e1e1e; color:#00ff00; font-family:monospace; font-size:12px; z-index:99999; border-top:3px solid #00ff00; overflow-y:auto; padding:10px;">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #00ff00; padding-bottom:5px;">
+                    <strong style="color:#00ff00;">🔧 CONSOLA DE EMERGENCIA</strong>
+                    <button onclick="document.getElementById('emergency-console').style.display='none'"
+                        style="background:#ff0000; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">CERRAR</button>
+                </div>
+                <div id="console-output" style="white-space:pre-wrap; word-wrap:break-word;"></div>
+                <div style="margin-top:10px; display:flex; gap:5px;">
+                    <input id="console-input" type="text" placeholder="Escribe comando aquí..."
+                        style="flex:1; background:#2d2d2d; color:#00ff00; border:1px solid #00ff00; padding:5px; font-family:monospace;">
+                    <button onclick="executeConsoleCommand()"
+                        style="background:#00ff00; color:black; border:none; padding:5px 15px; cursor:pointer; font-weight:bold;">EJECUTAR</button>
+                </div>
+            </div>
+
+            <!-- Botón flotante para abrir consola -->
+            <button onclick="document.getElementById('emergency-console').style.display='block'"
+                style="position:fixed; bottom:20px; right:20px; background:#00ff00; color:black; border:none; padding:15px 20px; border-radius:50px; cursor:pointer; font-weight:bold; z-index:99998; box-shadow:0 4px 15px rgba(0,255,0,0.4); font-size:14px;">
+                🔧 CONSOLA
+            </button>
+
+            <script>
+                // Interceptar console.log y mostrarlo en nuestra consola
+                (function () {
+                    const originalLog = console.log;
+                    const originalError = console.error;
+                    const originalWarn = console.warn;
+
+                    function addToConsole(message, type = 'log') {
+                        const output = document.getElementById('console-output');
+                        if (output) {
+                            const color = type === 'error' ? '#ff0000' : type === 'warn' ? '#ffff00' : '#00ff00';
+                            const timestamp = new Date().toLocaleTimeString();
+                            output.innerHTML += `<div style="color:${color}; margin-bottom:5px;">[${timestamp}] ${message}</div>`;
+                            output.scrollTop = output.scrollHeight;
+                        }
+                    }
+
+                    console.log = function (...args) {
+                        originalLog.apply(console, args);
+                        addToConsole(args.join(' '), 'log');
+                    };
+
+                    console.error = function (...args) {
+                        originalError.apply(console, args);
+                        addToConsole('❌ ERROR: ' + args.join(' '), 'error');
+                    };
+
+                    console.warn = function (...args) {
+                        originalWarn.apply(console, args);
+                        addToConsole('⚠️ WARNING: ' + args.join(' '), 'warn');
+                    };
+
+                    // Ejecutar comandos desde la consola
+                    window.executeConsoleCommand = function () {
+                        const input = document.getElementById('console-input');
+                        const command = input.value.trim();
+
+                        if (!command) return;
+
+                        addToConsole('> ' + command, 'log');
+
+                        try {
+                            const result = eval(command);
+                            if (result !== undefined) {
+                                if (result && typeof result.then === 'function') {
+                                    result.then(r => addToConsole('← ' + JSON.stringify(r, null, 2), 'log'))
+                                        .catch(e => addToConsole('❌ ' + e.message, 'error'));
+                                } else {
+                                    addToConsole('← ' + JSON.stringify(result, null, 2), 'log');
+                                }
+                            }
+                        } catch (error) {
+                            addToConsole('❌ ' + error.message, 'error');
+                        }
+
+                        input.value = '';
+                    };
+
+                    // Permitir Enter para ejecutar
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const input = document.getElementById('console-input');
+                        if (input) {
+                            input.addEventListener('keypress', (e) => {
+                                if (e.key === 'Enter') executeConsoleCommand();
+                            });
+                        }
+
+                        // Mensaje de bienvenida
+                        setTimeout(() => {
+                            addToConsole('✅ Consola de emergencia cargada', 'log');
+                            addToConsole('Puedes ejecutar comandos JavaScript aquí', 'log');
+                        }, 1000);
+                    });
+                    // Helpers for Image and Icon Selectors
+                    window.selectEntrenoImage = function (url) {
+                        const input = document.getElementById('edit-entreno-img-input');
+                        const preview = document.getElementById('edit-entreno-img-preview');
+                        if (input) {
+                            input.value = url;
+                            if (preview) {
+                                preview.src = url;
+                                preview.style.display = 'block';
+                            }
+                        }
+                    };
+
+                    window.selectImage = function (url) {
+                        const input = document.getElementById('edit-img-input');
+                        const preview = document.getElementById('edit-americana-img-preview');
+                        if (input) {
+                            input.value = url;
+                            if (preview) {
+                                preview.src = url;
+                                preview.style.display = 'block';
+                            }
+                        }
+                    };
+
+                    window.selectMenuIcon = function (iconClass) {
+                        const input = document.getElementById('menu-icon-input');
+                        const preview = document.getElementById('icon-preview-box');
+                        if (input) {
+                            input.value = iconClass;
+                            if (preview) {
+                                preview.innerHTML = `<i class="${iconClass}"></i>`;
+                            }
+                        }
+                    };
+                })();
+            </script>
+            <!-- CORE SERVICES (Consolidated) -->
+            <script src="js/modules/logic/MatchMakingService.js"></script>
+            <script src="js/modules/americanas/AmericanaLogic.js"></script>
+            <script src="js/modules/americanas/AmericanaService.js"></script>
+
+            <!-- ADMIN AUTOMATION -->
+            <script src="js/modules/logic/AutomationService.js"></script>
+            <script>
+                // Initialize Automation Service (Auto-Generate 4h before)
+                document.addEventListener('DOMContentLoaded', () => {
+                    setTimeout(() => {
+                        if (window.AutomationService) {
+                            console.log("🤖 Starting Automation Service (Auto-Pairing 4h before)...");
+                            window.AutomationService.init();
+                        } else {
+                            console.error("❌ AutomationService not loaded!");
+                        }
+                    }, 3000);
+                });
+            </script>
+</body>
+
+</html>

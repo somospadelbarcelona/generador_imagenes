@@ -1,0 +1,201 @@
+/* 
+ * SOMOS PADEL "AIR" THEME
+ * Inspired by Notion, Linear, Apple.
+ * Clean, White, Premium.
+ */
+
+:root {
+    /* --- COLOR PALETTE --- */
+    --bg-app: #F5F5F7;           /* Apple Gray Background */
+    --bg-card: #FFFFFF;          /* Pure White Cards */
+    --bg-sidebar: #FFFFFF;       
+    
+    --text-main: #1D1D1F;        /* Apple Black */
+    --text-secondary: #86868B;   /* Apple Gray Text */
+    --text-muted: #D2D2D7;
+
+    --primary: #C7F42A;          /* Brand Neon (Used sparingly for accents) */
+    --primary-dim: #E3F99D;      /* Lighter Brand */
+    
+    --accent-blue: #0071E3;      /* Apple Blue (Links, Info) */
+    --accent-red: #FF3B30;       /* Errors */
+    --accent-green: #34C759;     /* Success */
+    
+    --border-subtle: #E5E5E5;
+    --shadow-card: 0 4px 12px rgba(0,0,0,0.04);
+    --shadow-hover: 0 8px 24px rgba(0,0,0,0.08);
+
+    /* --- TYPOGRAPHY --- */
+    --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-heading: 'Outfit', sans-serif;
+}
+
+/* RESET & BASE */
+body {
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    font-family: var(--font-main);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* UTILS */
+.hidden { display: none !important; }
+.fade-in { animation: fadeIn 0.4s ease-out; }
+
+/* --- COMPONENTS: CARDS --- */
+.card-air {
+    background: var(--bg-card);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(0,0,0,0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-air:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.card-header-air {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.card-title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+}
+
+/* --- COMPONENTS: BUTTONS --- */
+.btn-air-primary {
+    background: var(--text-main); /* Black Button */
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-air-primary:hover {
+    background: #000;
+    transform: scale(1.02);
+}
+
+.btn-air-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-air-ghost:hover {
+    background: white;
+    border-color: var(--text-main);
+    color: var(--text-main);
+}
+
+/* --- NAVIGATION --- */
+.sidebar-air {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    width: 260px;
+    height: 100vh;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0; top: 0;
+}
+
+.nav-item-air {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 4px;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+    border: none;
+    background: none;
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+}
+
+.nav-item-air:hover {
+    background: #F5F5F7;
+    color: var(--text-main);
+}
+
+.nav-item-air.active {
+    background: #F5F5F7;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.nav-icon {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+/* --- LAYOUT GRID --- */
+.main-content-air {
+    margin-left: 260px;
+    padding: 40px;
+    max-width: 1200px;
+    margin-right: auto;
+}
+
+.grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.grid-3-col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+/* --- TYPOGRAPHY UTILS --- */
+h1.page-title {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: var(--text-main);
+}
+
+p.page-subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin: 0 0 32px 0;
+}
+
+/* --- KEYFRAMES --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug EN JUEGO - Console Abierta</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            color: #0ff;
+            border-bottom: 2px solid #0ff;
+            padding-bottom: 10px;
+        }
+
+        .command {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .command:hover {
+            background: #222;
+        }
+
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background: #0ff;
+        }
+
+        #output {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin-top: 20px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔧 DEBUG CONSOLE - EN JUEGO BUTTON</h1>
+
+    <p>Esta página te permite diagnosticar el problema del botón EN JUEGO sin necesidad de F12.</p>
+
+    <h2>PASO 1: Abre la aplicación principal</h2>
+    <button onclick="window.open('index.html', '_blank')">Abrir App Principal</button>
+
+    <h2>PASO 2: Ejecuta estos tests</h2>
+
+    <button onclick="test1()">Test 1: Verificar Módulos Cargados</button>
+    <button onclick="test2()">Test 2: Simular Clic en EN JUEGO</button>
+    <button onclick="test3()">Test 3: Ver Entrenos Disponibles</button>
+    <button onclick="clearOutput()">Limpiar Salida</button>
+
+    <div id="output">Esperando comandos...</div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+        }
+
+        function clearOutput() {
+            output.textContent = '';
+        }
+
+        function test1() {
+            clearOutput();
+            log('=== TEST 1: VERIFICAR MÓDULOS CARGADOS ===\n');
+
+            // Intentar acceder a la ventana principal
+            try {
+                const mainWindow = window.opener || window.parent;
+
+                log('✓ Acceso a ventana principal: OK');
+                log('ControlTowerView: ' + (typeof mainWindow.ControlTowerView !== 'undefined' ? '✅ CARGADO' : '❌ NO CARGADO'));
+                log('Router: ' + (typeof mainWindow.Router !== 'undefined' ? '✅ CARGADO' : '❌ NO CARGADO'));
+                log('EventsController: ' + (typeof mainWindow.EventsController !== 'undefined' ? '✅ CARGADO' : '❌ NO CARGADO'));
+                log('openLiveEvent: ' + (typeof mainWindow.openLiveEvent !== 'undefined' ? '✅ EXISTE' : '❌ NO EXISTE'));
+
+            } catch (e) {
+                log('❌ ERROR: No se puede acceder a la ventana principal');
+                log('Abre esta página desde la app principal o en la misma pestaña');
+                log('Error: ' + e.message);
+            }
+        }
+
+        function test2() {
+            clearOutput();
+            log('=== TEST 2: SIMULAR CLIC EN EN JUEGO ===\n');
+
+            const entrenoId = prompt('Ingresa el ID del entreno (o deja vacío para usar uno de prueba):');
+            const id = entrenoId || 'test-entreno-id';
+
+            try {
+                const mainWindow = window.opener || window.parent;
+
+                log('Intentando abrir entreno: ' + id);
+
+                if (typeof mainWindow.openLiveEvent === 'function') {
+                    mainWindow.openLiveEvent(id, 'entreno');
+                    log('✅ Función openLiveEvent ejecutada');
+                    log('Revisa la ventana principal para ver si se abrió la vista');
+                } else if (mainWindow.EventsController && typeof mainWindow.EventsController.openLiveEvent === 'function') {
+                    mainWindow.EventsController.openLiveEvent(id, 'entreno');
+                    log('✅ Función EventsController.openLiveEvent ejecutada');
+                } else {
+                    log('❌ No se encontró la función openLiveEvent');
+                }
+
+            } catch (e) {
+                log('❌ ERROR: ' + e.message);
+            }
+        }
+
+        function test3() {
+            clearOutput();
+            log('=== TEST 3: VER ENTRENOS DISPONIBLES ===\n');
+
+            try {
+                const mainWindow = window.opener || window.parent;
+
+                if (mainWindow.EventsController && mainWindow.EventsController.state) {
+                    const entrenos = mainWindow.EventsController.state.entrenos;
+
+                    if (entrenos && entrenos.length > 0) {
+                        log('Total de entrenos: ' + entrenos.length + '\n');
+
+                        entrenos.forEach((e, i) => {
+                            const hasStarted = mainWindow.EventsController.hasEventStarted(e.date, e.time);
+                            const isLive = e.status === 'live' || (e.status === 'open' && hasStarted);
+
+                            log(`Entreno ${i + 1}: ${e.name}`);
+                            log(`  ID: ${e.id}`);
+                            log(`  Fecha: ${e.date} ${e.time}`);
+                            log(`  Status: ${e.status}`);
+                            log(`  Ha empezado: ${hasStarted ? 'SÍ' : 'NO'}`);
+                            log(`  isLive: ${isLive ? 'SÍ' : 'NO'}`);
+                            log(`  Botón EN JUEGO visible: ${isLive ? '✅ SÍ' : '❌ NO'}`);
+                            log('');
+                        });
+                    } else {
+                        log('⚠️ No hay entrenos cargados');
+                    }
+                } else {
+                    log('❌ No se puede acceder al estado de EventsController');
+                }
+
+            } catch (e) {
+                log('❌ ERROR: ' + e.message);
+            }
+        }
+    </script>
+</body>
+
+</html>
